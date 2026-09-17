@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	goruntime "runtime"
@@ -191,6 +192,72 @@ func (a *App) DeleteConnection(id string) error {
 		return fmt.Errorf("config store unavailable")
 	}
 	return a.store.Delete(id)
+}
+
+// ExportConnections prompts for a save location and writes the saved
+// connection list as JSON. Deliberately metadata-only: store.Connection
+// has no password field (those live in the OS keyring, never in the
+// config file), so there's nothing secret to accidentally export.
+// Returns "" if the user cancels the dialog.
+func (a *App) ExportConnections() (string, error) {
+	if a.store == nil {
+		return "", fmt.Errorf("config store unavailable")
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Export Lupinus Connections",
+		DefaultFilename: "lupinus-connections.json",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSON (*.json)", Pattern: "*.json"},
+		},
+	})
+	if err != nil || path == "" {
+		return "", err
+	}
+	data, err := json.MarshalIndent(a.store.List(), "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// ImportConnections prompts for a file and adds every connection it
+// contains as a new saved connection (fresh IDs, so importing never
+// overwrites an existing one) — no password, matching the export format;
+// the user re-enters credentials per connection after importing. Returns
+// how many were imported, or 0 if the user cancels the dialog.
+func (a *App) ImportConnections() (int, error) {
+	if a.store == nil {
+		return 0, fmt.Errorf("config store unavailable")
+	}
+	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Import Lupinus Connections",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSON (*.json)", Pattern: "*.json"},
+		},
+	})
+	if err != nil || path == "" {
+		return 0, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	var conns []store.Connection
+	if err := json.Unmarshal(data, &conns); err != nil {
+		return 0, fmt.Errorf("not a valid Lupinus connections file: %w", err)
+	}
+	imported := 0
+	for _, c := range conns {
+		c.ID = ""
+		c.LastUsed = ""
+		if _, err := a.store.Save(c, ""); err == nil {
+			imported++
+		}
+	}
+	return imported, nil
 }
 
 // --- Live sessions ---

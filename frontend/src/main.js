@@ -12,6 +12,8 @@ import {
   Disconnect,
   OpenSupportLink,
   OpenGitHub,
+  ExportConnections,
+  ImportConnections,
 } from '../wailsjs/go/main/App'
 import { EventsOn } from '../wailsjs/runtime/runtime'
 
@@ -254,7 +256,7 @@ function renderConnCard(c) {
   const statusClass = statusClassFor(c)
   const isLive = statusClass === 'connected' || statusClass === 'connecting' || statusClass === 'reconnecting'
   return `
-    <div class="conn-card">
+    <div class="conn-card" style="${colorTagHex(c.colorTag) ? `--tag-color:${colorTagHex(c.colorTag)};` : ''}">
       <span class="status-dot ${esc(statusClass)}" title="${attr(statusLabel(statusClass))}"></span>
       <div class="conn-info">
         <div class="conn-name trunc">${esc(c.name || c.host)}</div>
@@ -319,6 +321,14 @@ function renderSettingsPage() {
         <button class="${theme === 'light' ? 'active' : ''}" onclick="window._setTheme('light')">Light</button>
         <button class="${theme === 'dark' ? 'active' : ''}" onclick="window._setTheme('dark')">Dark</button>
         <button class="${theme === 'system' ? 'active' : ''}" onclick="window._setTheme('system')">System</button>
+      </div>
+    </div>
+    <div class="settings-card">
+      <h2>Connections</h2>
+      <p class="soft" style="margin:0;font-size:13px;">Back up or move your saved connections between machines. Passwords are never included — they stay in this OS's credential store.</p>
+      <div class="row">
+        <button class="btn sm" onclick="window._exportConnections()">Export…</button>
+        <button class="btn sm ghost" onclick="window._importConnections()">Import…</button>
       </div>
     </div>
     <div class="settings-card">
@@ -389,6 +399,46 @@ function renderAboutModal() {
   `
 }
 
+// Preset palette for organizing saved connections by color — purely a
+// user-facing label, no semantic meaning. '' is "no tag".
+const COLOR_TAGS = [
+  { key: '', hex: null },
+  { key: 'violet', hex: '#7c5cff' },
+  { key: 'sakura', hex: '#f29bcb' },
+  { key: 'teal', hex: '#4fd1c5' },
+  { key: 'amber', hex: '#f6ad55' },
+  { key: 'rose', hex: '#fc8181' },
+  { key: 'slate', hex: '#94a3b8' },
+]
+
+function colorTagHex(key) {
+  return COLOR_TAGS.find((t) => t.key === key)?.hex || null
+}
+
+function renderColorTagPicker(prefix, selected) {
+  return `
+    <div class="field">
+      <label>Color Tag</label>
+      <div class="colortag-picker" id="${prefix}-colortag-picker" data-value="${attr(selected)}">
+        ${COLOR_TAGS.map(
+          (t) => `
+          <button type="button" class="colortag-swatch ${t.key === selected ? 'selected' : ''} ${t.hex ? '' : 'none'}"
+            data-key="${attr(t.key)}" style="${t.hex ? `background:${t.hex};` : ''}"
+            onclick="window._pickColorTag('${prefix}', '${attr(t.key)}')" title="${t.key || 'None'}"></button>
+        `
+        ).join('')}
+      </div>
+    </div>
+  `
+}
+
+window._pickColorTag = (prefix, key) => {
+  const picker = document.getElementById(`${prefix}-colortag-picker`)
+  if (!picker) return
+  picker.dataset.value = key
+  for (const el of picker.children) el.classList.toggle('selected', el.dataset.key === key)
+}
+
 function renderConnFormModal(m) {
   const editing = !!m.id
   const c = editing ? state.connections.find((x) => x.id === m.id) : null
@@ -401,6 +451,7 @@ function renderConnFormModal(m) {
   const portVal = d ? d.port : String(c?.port || defaultPortFor(protocol))
   const userVal = d ? d.username : c?.username || ''
   const passVal = d ? d.password : ''
+  const colorTagVal = d ? d.colorTag || '' : c?.colorTag || ''
   return `
     <div class="modal-overlay">
       <div class="modal">
@@ -434,6 +485,7 @@ function renderConnFormModal(m) {
           <input id="f-pass" type="password" value="${attr(passVal)}" placeholder="${editing ? 'Leave blank to keep current' : 'Optional'}">
           ${editing ? '<div class="field-hint">Leave blank to keep the stored credential.</div>' : ''}
         </div>
+        ${renderColorTagPicker('f', colorTagVal)}
         <div class="modal-foot">
           <button class="btn" onclick="window._closeModal()">Cancel</button>
           <button class="btn primary" onclick="window._saveConnection('${editing ? attr(m.id) : ''}')">${editing ? 'Save' : 'Add'}</button>
@@ -856,7 +908,8 @@ window._setModalProtocol = (prefix, protocol) => {
   const prevProtocol = state.modal.draft?.protocol || (prefix === 'f' && state.modal.id ? state.connections.find((c) => c.id === state.modal.id)?.protocol : null) || 'vnc'
   const port = portRaw === '' || parseInt(portRaw, 10) === defaultPortFor(prevProtocol) ? String(defaultPortFor(protocol)) : portRaw
   const name = prefix === 'f' ? $('#f-name')?.value.trim() || '' : undefined
-  state.modal.draft = { protocol, name, host, port, username, password }
+  const colorTag = prefix === 'f' ? document.getElementById('f-colortag-picker')?.dataset.value || '' : undefined
+  state.modal.draft = { protocol, name, host, port, username, password, colorTag }
   renderModal()
 }
 
@@ -900,9 +953,10 @@ window._saveConnection = async (id) => {
   const port = parseInt(portRaw, 10)
   const username = protocol === 'rdp' ? $('#f-user').value.trim() : ''
   const password = $('#f-pass').value
+  const colorTag = document.getElementById('f-colortag-picker')?.dataset.value || ''
   if (!host || !Number.isFinite(port) || port <= 0) {
     state.modal.error = 'Host and a valid port are required.'
-    state.modal.draft = { protocol, name, host, port: portRaw, username, password }
+    state.modal.draft = { protocol, name, host, port: portRaw, username, password, colorTag }
     renderModal()
     return
   }
@@ -913,7 +967,7 @@ window._saveConnection = async (id) => {
     host,
     port,
     username,
-    colorTag: existing?.colorTag || '',
+    colorTag,
     lastUsed: existing?.lastUsed || '',
   }
   try {
@@ -952,6 +1006,28 @@ window._setTheme = async (theme) => {
     await SetTheme(theme)
   } catch {
     toast('Could not save the theme preference', 'err')
+  }
+}
+
+window._exportConnections = async () => {
+  try {
+    const path = await ExportConnections()
+    if (path) toast(`Exported to ${path}`, 'ok')
+  } catch (e) {
+    toast((e && (e.message || e.toString())) || 'Export failed', 'err')
+  }
+}
+
+window._importConnections = async () => {
+  try {
+    const count = await ImportConnections()
+    if (count > 0) {
+      state.connections = (await ListConnections()) || []
+      render()
+      toast(`Imported ${count} connection${count === 1 ? '' : 's'}`, 'ok')
+    }
+  } catch (e) {
+    toast((e && (e.message || e.toString())) || 'Import failed', 'err')
   }
 }
 
