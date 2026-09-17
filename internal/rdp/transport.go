@@ -168,10 +168,11 @@ func readX224Data(r io.Reader) ([]byte, error) {
 
 // buildConnectionRequest builds the X.224 Connection Request TPDU
 // (MS-RDPBCGR 2.2.1.1), including an informational routing cookie and an
-// RDP Negotiation Request advertising PROTOCOL_SSL only — this client
-// never offers RDP Standard Security (legacy RC4) or Hybrid/NLA (see the
-// project plan for why NLA is a deliberate, documented gap).
-func buildConnectionRequest(username string) []byte {
+// RDP Negotiation Request advertising requestedProtocols — PROTOCOL_SSL
+// alone, or PROTOCOL_SSL|PROTOCOL_HYBRID when NLA (credssp.go) is being
+// attempted; see Dial's doc comment for how that's decided. This client
+// never offers RDP Standard Security (legacy RC4).
+func buildConnectionRequest(username string, requestedProtocols uint32) []byte {
 	var cookie []byte
 	if username != "" {
 		cookie = []byte(fmt.Sprintf("Cookie: mstshash=%s\r\n", username))
@@ -181,10 +182,10 @@ func buildConnectionRequest(username string) []byte {
 	negReq[0] = negTypeRequest
 	negReq[1] = 0 // flags
 	negReq[2], negReq[3] = 8, 0
-	negReq[4] = byte(negProtocolSSL)
-	negReq[5] = byte(negProtocolSSL >> 8)
-	negReq[6] = byte(negProtocolSSL >> 16)
-	negReq[7] = byte(negProtocolSSL >> 24)
+	negReq[4] = byte(requestedProtocols)
+	negReq[5] = byte(requestedProtocols >> 8)
+	negReq[6] = byte(requestedProtocols >> 16)
+	negReq[7] = byte(requestedProtocols >> 24)
 
 	variable := append(cookie, negReq...)
 
@@ -237,8 +238,8 @@ func parseConnectionConfirm(payload []byte) (uint32, error) {
 		if err != nil {
 			return 0, err
 		}
-		if selected != negProtocolSSL {
-			return 0, &UnsupportedError{Msg: fmt.Sprintf("server selected security protocol 0x%x, only TLS (PROTOCOL_SSL) is implemented", selected)}
+		if selected != negProtocolSSL && selected != negProtocolHybrid {
+			return 0, &UnsupportedError{Msg: fmt.Sprintf("server selected security protocol 0x%x, only TLS (PROTOCOL_SSL) and CredSSP/NLA (PROTOCOL_HYBRID) are implemented", selected)}
 		}
 		return selected, nil
 	case negTypeFailure:
@@ -246,7 +247,7 @@ func parseConnectionConfirm(payload []byte) (uint32, error) {
 		if err != nil {
 			return 0, err
 		}
-		return 0, &UnsupportedError{Msg: fmt.Sprintf("server refused negotiation (failure code 0x%x) — if this is a Windows host, it likely requires NLA, which isn't implemented yet", code)}
+		return 0, &UnsupportedError{Msg: fmt.Sprintf("server refused negotiation (failure code 0x%x)", code)}
 	default:
 		return 0, protoErrf("unexpected negotiation message type 0x%02x", negType)
 	}

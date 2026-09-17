@@ -150,19 +150,38 @@ func (c *Client) Run(ctx context.Context, sink FramebufferSink) error {
 	}
 }
 
-// negotiateSecurity performs the X.224 Connection Request/Confirm exchange
-// and, once the server confirms PROTOCOL_SSL, upgrades the connection to
-// TLS. See transport.go.
+// negotiateSecurity performs the X.224 Connection Request/Confirm exchange,
+// upgrades the connection to TLS once the server confirms, and — when the
+// server selected PROTOCOL_HYBRID — runs the CredSSP/NLA authentication
+// exchange (credssp.go) inside that TLS tunnel before RDP-level traffic
+// (MCS/GCC) begins. See transport.go for the wire framing.
+//
+// NLA is attempted automatically, never explicitly toggled: it's the only
+// way to authenticate before the TLS handshake's certificate is even
+// checked, so it needs a username/password upfront (unlike PROTOCOL_SSL,
+// where credentials go in the Client Info PDU much later); this client
+// offers PROTOCOL_HYBRID only when both are present, and always offers
+// PROTOCOL_SSL as a fallback the server can pick instead if it doesn't
+// require NLA.
 func (c *Client) negotiateSecurity() error {
-	if err := writeTPKT(c.tc, buildConnectionRequest(c.username)); err != nil {
+	requestedProtocols := negProtocolSSL
+	if c.username != "" && c.password != "" {
+		requestedProtocols |= negProtocolHybrid
+	}
+
+	if err := writeTPKT(c.tc, buildConnectionRequest(c.username, requestedProtocols)); err != nil {
 		return err
 	}
 	payload, err := readTPKT(c.tc)
 	if err != nil {
 		return err
 	}
-	if _, err := parseConnectionConfirm(payload); err != nil {
+	selected, err := parseConnectionConfirm(payload)
+	if err != nil {
 		return err
+	}
+	if debugWire {
+		fmt.Fprintf(osStderr, "DEBUG negotiateSecurity: requested=0x%x selected=0x%x\n", requestedProtocols, selected)
 	}
 
 	// RDP servers overwhelmingly use self-signed certificates, so there's
@@ -189,5 +208,16 @@ func (c *Client) negotiateSecurity() error {
 	}
 
 	c.tc = tlsConn
+
+	if selected == negProtocolHybrid {
+		peers := tlsConn.ConnectionState().PeerCertificates
+		if len(peers) == 0 {
+			return protoErrf("rdp: server presented no TLS certificate for NLA")
+		}
+		if err := c.performCredSSP(peers[0]); err != nil {
+			return fmt.Errorf("rdp: NLA authentication: %w", err)
+		}
+	}
+
 	return nil
 }

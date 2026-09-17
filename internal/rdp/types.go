@@ -43,10 +43,11 @@ const (
 // RDP Negotiation Request/Response types and flags (part of the X.224
 // Connection Request/Confirm PDUs).
 const (
-	negTypeRequest         = 0x01
-	negTypeResponse        = 0x02
-	negTypeFailure         = 0x03
-	negProtocolSSL  uint32 = 0x00000001
+	negTypeRequest           = 0x01
+	negTypeResponse          = 0x02
+	negTypeFailure           = 0x03
+	negProtocolSSL    uint32 = 0x00000001
+	negProtocolHybrid uint32 = 0x00000002 // CredSSP/NLA (credssp.go)
 )
 
 // MCS (T.125) PDU choice tags: the high 6 bits of the first byte of every
