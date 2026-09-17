@@ -46,6 +46,12 @@ const (
 	dataBlockServerNetwork  = 0x0C03
 )
 
+// channelOptionInitialized is CHANNEL_OPTION_INITIALIZED (MS-RDPBCGR
+// 2.2.1.3.4.1) — every requested channel sets this; it's the only option
+// this client uses (no CHANNEL_OPTION_COMPRESS_RDP, so virtual channel
+// data never needs MPPC decompression).
+const channelOptionInitialized = 0x80000000
+
 // buildClientCoreData builds the Client Core Data block (MS-RDPBCGR
 // 2.2.1.3.2): desktop size, color depth, and the handful of capability
 // flags/identifiers real servers expect to see filled in sensibly.
@@ -89,13 +95,23 @@ func buildClientSecurityData() []byte {
 	return b.Bytes()
 }
 
+// cliprdrChannelName is the well-known static virtual channel name for
+// clipboard redirection (MS-RDPECLIP) — always exactly 8 bytes, ASCII,
+// null-padded, per CHANNEL_DEF (MS-RDPBCGR 2.2.1.3.4.1).
+const cliprdrChannelName = "cliprdr"
+
 // buildClientNetworkData builds the Client Network Data block
-// (MS-RDPBCGR 2.2.1.3.4). This client requests zero additional virtual
-// channels (no clipboard/drive/audio redirection in v0.2.0) — just the
-// implicit I/O channel every session gets.
+// (MS-RDPBCGR 2.2.1.3.4). Requests exactly one additional virtual channel
+// — clipboard redirection — beyond the implicit I/O channel every session
+// gets; the server may still refuse it (see parseGCCConferenceCreateResponse),
+// in which case clipboard sync is silently unavailable for the session.
 func buildClientNetworkData() []byte {
 	var b bytes.Buffer
-	writeUint32LE(&b, 0) // channelCount
+	writeUint32LE(&b, 1) // channelCount
+	var name [8]byte
+	copy(name[:], cliprdrChannelName)
+	b.Write(name[:])
+	writeUint32LE(&b, channelOptionInitialized) // options: no compression, no persistence
 	return b.Bytes()
 }
 
@@ -154,12 +170,17 @@ func buildGCCConferenceCreateRequest(width, height int) []byte {
 }
 
 // parseGCCConferenceCreateResponse extracts what this client actually
-// needs from the server's GCC user data: the I/O channel ID out of Server
-// Network Data. The exact PER header the response is wrapped in isn't
-// worth precisely replicating a parser for (unlike the request, which
-// this client fully controls) — instead scan for the first well-formed
-// Server Core Data block header and parse the sequential data blocks from
-// there, which is robust to minor header differences between server
+// needs from the server's GCC user data: the I/O channel ID, and the
+// server-assigned channel ID for each virtual channel this client
+// requested (MS-RDPBCGR 2.2.1.4.4 TS_UD_SC_NET: MCSChannelId, channelCount,
+// then one 16-bit channel ID per requested channel, in the SAME ORDER
+// buildClientNetworkData listed them — a 0 entry means the server refused
+// that specific channel). This client only ever requests one ("cliprdr"),
+// at index 0. The exact PER header the response is wrapped in isn't worth
+// precisely replicating a parser for (unlike the request, which this
+// client fully controls) — instead scan for the first well-formed Server
+// Core Data block header and parse the sequential data blocks from there,
+// which is robust to minor header differences between server
 // implementations.
 func (c *Client) parseGCCConferenceCreateResponse(userData []byte) error {
 	start := -1
@@ -184,6 +205,13 @@ func (c *Client) parseGCCConferenceCreateResponse(userData []byte) error {
 
 		if blockType == dataBlockServerNetwork && len(body) >= 4 {
 			c.ioChannelID = uint16(body[0]) | uint16(body[1])<<8
+			channelCount := int(uint16(body[2]) | uint16(body[3])<<8)
+			// index 0 is "cliprdr", the only channel this client requests.
+			if channelCount >= 1 && len(body) >= 6 {
+				if id := uint16(body[4]) | uint16(body[5])<<8; id != 0 {
+					c.cliprdrChannelID = id
+				}
+			}
 		}
 
 		buf = buf[blockLen:]

@@ -89,6 +89,7 @@ func (c *Client) handleSlowPathPDU(sink FramebufferSink) error {
 	if choice := mcs[0] >> 2; int(choice) != mcsChoiceSendDataIndication {
 		return protoErrf("slow-path PDU: expected SendDataIndication (choice %d), got %d", mcsChoiceSendDataIndication, choice)
 	}
+	channelID := uint16(mcs[3])<<8 | uint16(mcs[4])
 	rest2 := mcs[6:] // past choice, initiator(2), channelId(2), priority(1)
 	length, n, err := readPERLength(rest2)
 	if err != nil {
@@ -99,6 +100,13 @@ func (c *Client) handleSlowPathPDU(sink FramebufferSink) error {
 		return protoErrf("slow-path PDU: declared length %d exceeds remaining %d bytes", length, len(data))
 	}
 	data = data[:length]
+
+	if channelID != c.ioChannelID {
+		if channelID == c.cliprdrChannelID {
+			return c.handleVirtualChannelChunk(data, sink)
+		}
+		return nil // some other channel this client never joined: ignore
+	}
 
 	// ShareControlHeader(6) + ShareDataHeader(12).
 	if len(data) < 6+12 {

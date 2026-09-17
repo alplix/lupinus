@@ -39,6 +39,13 @@ func (c *Client) mcsConnect() error {
 	if err := c.joinChannel(c.ioChannelID); err != nil {
 		return err
 	}
+	if c.cliprdrChannelID != 0 {
+		if err := c.joinChannel(c.cliprdrChannelID); err != nil {
+			// Not fatal: fall back to no clipboard sync rather than
+			// failing the whole connection over an optional channel.
+			c.cliprdrChannelID = 0
+		}
+	}
 	return nil
 }
 

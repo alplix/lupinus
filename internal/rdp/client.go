@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -33,9 +34,20 @@ type Client struct {
 	serverWidth, serverHeight int
 	mcsUserID                 uint16
 	ioChannelID               uint16
+	cliprdrChannelID          uint16 // 0 if the server refused clipboard redirection
 	shareID                   uint32
 
 	bitsPerPixel int // negotiated with the server's Bitmap capability, see capabilities.go
+
+	// Clipboard state (cliprdr.go). Guarded by clipMu since SendClientCutText
+	// is called from wsbridge's input goroutine while the Run() goroutine
+	// concurrently handles incoming CB_FORMAT_DATA_REQUEST for the same text.
+	clipMu   sync.Mutex
+	clipText string
+
+	// Virtual channel chunk reassembly (MS-RDPBCGR 2.2.6.1). Only one
+	// non-I/O channel exists (cliprdr), so a single buffer suffices.
+	vcBuf []byte
 }
 
 // Dial connects to addr (host:port) and runs the full pre-session setup:

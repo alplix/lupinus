@@ -83,11 +83,19 @@ func (c *Client) SendKeyEvent(keysym uint32, down bool) error {
 	return c.sendFastPathInputEvent(fpInputEventScancode, eventFlags, []byte{scancode})
 }
 
-// SendClientCutText is a no-op: the clipboard virtual channel isn't
-// implemented in v0.2.0 (see the project plan). wsbridge.Session's
-// InputSink interface still requires the method so the same Session type
-// works with both rfb.Client and rdp.Client.
-func (c *Client) SendClientCutText(text string) error { return nil }
+// SendClientCutText shares local clipboard text with the server via the
+// cliprdr virtual channel (see cliprdr.go), the RDP equivalent of VNC's
+// ClientCutText message. A no-op if the server refused the clipboard
+// channel during connection setup.
+func (c *Client) SendClientCutText(text string) error {
+	if c.cliprdrChannelID == 0 {
+		return nil
+	}
+	c.clipMu.Lock()
+	c.clipText = text
+	c.clipMu.Unlock()
+	return c.sendFormatList(true)
+}
 
 // sendFastPathInputEvent wraps a single TS_FP_INPUT_EVENT in a Fast-Path
 // Input PDU (MS-RDPBCGR 2.2.8.1.2) and sends it — one event per PDU, never
