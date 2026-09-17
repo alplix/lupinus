@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/getlantern/systray"
+	"github.com/cardinalby/go-systray"
 	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 

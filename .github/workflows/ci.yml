@@ -60,7 +60,8 @@ jobs:
       # which main.go's go:embed directives and frontend/src/main.js need —
       # so this must run before Go vet/test, not just as a final check.
       - name: Wails build (linux/amd64 smoke test)
-        run: wails build -platform linux/amd64 -clean
+        # -tags webkit2_41: ubuntu-latest only ships libwebkit2gtk-4.1-dev.
+        run: wails build -platform linux/amd64 -tags webkit2_41 -clean
 
       - name: Go vet
         run: go vet ./...

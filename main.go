@@ -21,16 +21,15 @@ var assets embed.FS
 var iconPNG []byte
 
 // systray.SetIcon expects an ICO payload on Windows (PNG bytes are silently
-// rejected there — confirmed live: getlantern/systray logs "Unable to set
-// icon" every time with the PNG). macOS/Linux tray backends are fine with
-// the PNG, so only the tray icon itself is swapped by OS; the window icon
-// and macOS About panel keep using iconPNG.
+// rejected there). macOS/Linux tray backends are fine with the PNG, so only
+// the tray icon itself is swapped by OS; the window icon and macOS About
+// panel keep using iconPNG.
 //
 //go:embed build/windows/icon.ico
 var iconICO []byte
 
 // main calls wails.Run directly as the program's primary blocking call —
-// deliberately NOT wrapped inside systray.Run (getlantern/systray's own
+// deliberately NOT wrapped inside systray.Run (cardinalby/go-systray's own
 // blocking event loop). `wails build` generates bindings by compiling and
 // actually running this binary; if the program never reaches a point where
 // it can exit on its own, that step hangs forever. The system tray is
