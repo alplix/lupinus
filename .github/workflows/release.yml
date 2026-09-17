@@ -41,10 +41,14 @@ jobs:
           fi
 
   build-windows:
-    name: Build windows/amd64
+    name: Build windows/${{ matrix.arch }}
     needs: [verify-version]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
 
@@ -59,12 +63,16 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install mingw, nsis and GTK dependencies
-        # mingw/nsis cross-compile the actual windows/amd64 output; the GTK
-        # stack is unrelated to that target but still required because
-        # `wails build`'s bindings-generation step compiles and runs a real
-        # helper binary for the HOST platform (linux) first, and that binary
-        # links the app's own dependencies (systray -> GTK/appindicator)
-        # regardless of what -platform was requested.
+        # mingw/nsis cross-compile the actual windows output; the GTK stack
+        # is unrelated to that target but still required because `wails
+        # build`'s bindings-generation step compiles and runs a real helper
+        # binary for the HOST platform (linux) first, and that binary links
+        # the app's own dependencies (systray -> GTK/appindicator, plus
+        # Wails' own linux webview backend) regardless of what -platform
+        # was requested. Neither the app's own code nor Wails' windows
+        # backend needs CGO for the actual windows/${{ matrix.arch }}
+        # binary itself (both are pure Go + syscalls on that OS), so no
+        # arm64 mingw cross-toolchain is needed even for that target.
         run: |
           sudo apt-get update
           sudo apt-get install -y mingw-w64 nsis libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
@@ -76,22 +84,26 @@ jobs:
         # -tags webkit2_41: ubuntu-latest only ships libwebkit2gtk-4.1-dev
         # (4.0 was dropped from the distro); needed for the same
         # host-bindings-helper reason as the GTK packages above.
-        run: wails build -platform windows/amd64 -tags webkit2_41 -clean -nsis -webview2 download
+        run: wails build -platform windows/${{ matrix.arch }} -tags webkit2_41 -clean -nsis -webview2 download
 
-      - name: Stage portable zip
+      - name: Stage portable zip and installer
         working-directory: build/bin
+        # The NSIS installer's output name comes from wails.json's "name"
+        # (Info.PROJECTNAME in its default project.nsi template), not
+        # "outputfilename" — those differ here ("Lupinus" vs "lupinus").
         run: |
-          mv lupinus.exe lupinus-windows-amd64.exe
-          zip -r ../../lupinus-windows-amd64.zip lupinus-windows-amd64.exe
+          mv lupinus.exe lupinus-windows-${{ matrix.arch }}.exe
+          zip -r ../../lupinus-windows-${{ matrix.arch }}.zip lupinus-windows-${{ matrix.arch }}.exe
+          mv Lupinus-${{ matrix.arch }}-installer.exe ../../lupinus-windows-${{ matrix.arch }}-setup.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lupinus-windows-amd64
+          name: lupinus-windows-${{ matrix.arch }}
           if-no-files-found: error
           path: |
-            lupinus-windows-amd64.zip
-            build/bin/lupinus-amd64-installer.exe
+            lupinus-windows-${{ matrix.arch }}.zip
+            lupinus-windows-${{ matrix.arch }}-setup.exe
 
   build-linux:
     name: Build linux ${{ matrix.arch }}
@@ -148,6 +160,53 @@ jobs:
           if-no-files-found: error
           path: lupinus-linux-${{ matrix.arch }}.tar.gz
 
+  build-linux-riscv64:
+    name: Build linux riscv64
+    needs: [verify-version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: riscv64
+
+      - name: Build inside an emulated riscv64 container
+        # No riscv64 GitHub-hosted runner exists, and there's no amd64-
+        # hosted riscv64 cross-compile toolchain with matching GTK/
+        # webkit2gtk dev packages available either — so this runs the
+        # whole build natively inside a QEMU-emulated riscv64 container
+        # instead (golang's own official image ships a riscv64 variant),
+        # where `apt-get install` pulls real riscv64 packages. Slower
+        # than a native or cross build (software CPU emulation), but
+        # needs no sysroot wrangling.
+        run: |
+          docker run --rm --platform linux/riscv64 \
+            -v "${{ github.workspace }}:/work" -w /work \
+            golang:${{ env.GO_VERSION }}-trixie bash -euxc '
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                nodejs npm libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+              go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+              export PATH="$PATH:$(go env GOPATH)/bin"
+              wails build -platform linux/riscv64 -tags webkit2_41 -clean
+            '
+
+      - name: Stage archive
+        working-directory: build/bin
+        run: |
+          mv lupinus lupinus-linux-riscv64
+          tar -czf ../../lupinus-linux-riscv64.tar.gz lupinus-linux-riscv64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lupinus-linux-riscv64
+          if-no-files-found: error
+          path: lupinus-linux-riscv64.tar.gz
+
   build-darwin:
     name: Build darwin ${{ matrix.arch }}
     needs: [verify-version]
@@ -192,7 +251,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [build-windows, build-linux, build-darwin]
+    needs: [build-windows, build-linux, build-linux-riscv64, build-darwin]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
