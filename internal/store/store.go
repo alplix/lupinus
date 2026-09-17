@@ -34,7 +34,8 @@ type Connection struct {
 
 type fileData struct {
 	Connections []Connection `json:"connections"`
-	Theme       string       `json:"theme"` // "light" | "dark" | "system"
+	Theme       string       `json:"theme"`                // "light" | "dark" | "system"
+	VNCQuality  string       `json:"vncQuality,omitempty"` // "balanced" | "quality" | "bandwidth" — see internal/rfb's DialOptions doc comment
 
 	// TrustedCerts implements trust-on-first-use for RDP's TLS layer,
 	// which almost always presents a self-signed certificate — there's no
@@ -66,7 +67,7 @@ func Open() (*Store, error) {
 
 	s := &Store{
 		path: filepath.Join(dir, "config.json"),
-		data: fileData{Theme: "system"},
+		data: fileData{Theme: "system", VNCQuality: "balanced"},
 	}
 
 	if b, err := os.ReadFile(s.path); err == nil {
@@ -189,6 +190,23 @@ func (s *Store) Theme() string {
 func (s *Store) SetTheme(theme string) error {
 	s.mu.Lock()
 	s.data.Theme = theme
+	err := s.persistLocked()
+	s.mu.Unlock()
+	return err
+}
+
+func (s *Store) VNCQuality() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.VNCQuality == "" {
+		return "balanced"
+	}
+	return s.data.VNCQuality
+}
+
+func (s *Store) SetVNCQuality(quality string) error {
+	s.mu.Lock()
+	s.data.VNCQuality = quality
 	err := s.persistLocked()
 	s.mu.Unlock()
 	return err

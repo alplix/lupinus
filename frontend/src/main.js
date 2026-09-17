@@ -7,6 +7,8 @@ import {
   DeleteConnection,
   GetTheme,
   SetTheme,
+  GetVNCQuality,
+  SetVNCQuality,
   Connect,
   QuickConnect,
   Disconnect,
@@ -82,6 +84,7 @@ const state = {
   page: 'connections', // 'connections' | 'settings' | 'viewer'
   connections: [],
   theme: 'system',
+  vncQuality: 'balanced', // 'balanced' | 'quality' | 'bandwidth' — see internal/rfb's qualityPresetLevels
   about: null,
   modal: null, // { type: 'about' | 'connForm' | 'quickConnect', ...fields }
   toasts: [],
@@ -313,6 +316,7 @@ function renderConnectionsPage() {
 
 function renderSettingsPage() {
   const theme = state.theme
+  const vncQuality = state.vncQuality
   return `
     <div class="page-heading">
       <h1>Settings</h1>
@@ -325,6 +329,16 @@ function renderSettingsPage() {
         <button class="${theme === 'dark' ? 'active' : ''}" onclick="window._setTheme('dark')">Dark</button>
         <button class="${theme === 'system' ? 'active' : ''}" onclick="window._setTheme('system')">System</button>
       </div>
+    </div>
+    <div class="settings-card">
+      <h2>VNC Quality</h2>
+      <p class="soft" style="margin:0 0 8px;font-size:13px;">How much VNC sessions favor image fidelity over update speed. RDP is unaffected — its codec doesn't have an equivalent tradeoff.</p>
+      <div class="theme-options">
+        <button class="${vncQuality === 'quality' ? 'active' : ''}" onclick="window._setVNCQuality('quality')">High quality (LAN)</button>
+        <button class="${vncQuality === 'balanced' ? 'active' : ''}" onclick="window._setVNCQuality('balanced')">Balanced</button>
+        <button class="${vncQuality === 'bandwidth' ? 'active' : ''}" onclick="window._setVNCQuality('bandwidth')">Low bandwidth (WAN)</button>
+      </div>
+      <p class="soft" style="margin:8px 0 0;font-size:12px;">Over a slow or high-latency link (a session run over the internet rather than a LAN), "Low bandwidth" trades some image fidelity for noticeably faster-feeling updates.</p>
     </div>
     <div class="settings-card">
       <h2>Connections</h2>
@@ -1046,6 +1060,19 @@ window._setTheme = async (theme) => {
   }
 }
 
+// Only affects VNC sessions started after this changes — see
+// internal/rfb's qualityPresetLevels for what each preset actually asks
+// the server for.
+window._setVNCQuality = async (quality) => {
+  state.vncQuality = quality
+  render()
+  try {
+    await SetVNCQuality(quality)
+  } catch {
+    toast('Could not save the VNC quality preference', 'err')
+  }
+}
+
 window._exportConnections = async () => {
   try {
     const path = await ExportConnections()
@@ -1152,6 +1179,12 @@ async function init() {
     state.theme = 'system'
   }
   applyTheme(state.theme)
+
+  try {
+    state.vncQuality = await GetVNCQuality()
+  } catch {
+    state.vncQuality = 'balanced'
+  }
 
   try {
     state.connections = (await ListConnections()) || []

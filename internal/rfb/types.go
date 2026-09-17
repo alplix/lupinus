@@ -62,18 +62,26 @@ const (
 	encodingQualityLevel0  = -32
 )
 
-// wanCompressLevel/wanQualityLevel are what sendSetEncodings actually
-// requests: fairly aggressive compression and a middling JPEG quality,
-// tuned for "works acceptably over a slow/high-latency WAN link" rather
-// than assuming a LAN — see encodingCompressLevel0's doc comment. Every
-// server this client has been tested against (TigerVNC, plus real macOS
-// Screen Sharing) is free to ignore either hint; there's no fallback
-// needed because both are optional pseudo-encodings, not a negotiated
-// requirement.
-const (
-	wanCompressLevel = 7
-	wanQualityLevel  = 5
-)
+// qualityPresetLevels maps DialOptions.Quality's named presets to the
+// (compressLevel, qualityLevel) pair sendSetEncodings actually advertises
+// — see encodingCompressLevel0's doc comment for what these numbers mean
+// on the wire. "balanced" is the default (also what an empty/unrecognized
+// Quality falls back to): reasonably bandwidth-conscious without looking
+// noticeably worse than a LAN session. Every server this client has been
+// tested against (TigerVNC, plus real macOS Screen Sharing) is free to
+// ignore either hint; there's no fallback logic needed on this client's
+// side because both are optional pseudo-encodings, not something the
+// server confirms back.
+func qualityPresetLevels(preset string) (compressLevel, qualityLevel int) {
+	switch preset {
+	case "quality": // LAN / fast link: favor fidelity over size
+		return 2, 8
+	case "bandwidth": // slow/high-latency WAN: favor size over fidelity
+		return 9, 2
+	default: // "balanced"
+		return 7, 5
+	}
+}
 
 // PixelFormat mirrors the 16-byte PIXEL_FORMAT structure. Lupinus always
 // requests the same fixed format from the server (see requestedPixelFormat

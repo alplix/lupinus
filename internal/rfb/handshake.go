@@ -263,6 +263,7 @@ func (c *Client) sendSetEncodings() error {
 	// decoder for ExtendedDesktopSize (decodeExtendedDesktopSize) is left
 	// in place and correct, it's just not negotiated. Multi-monitor/
 	// layout-aware resize is already a roadmap item, not v0.1.0 scope.
+	compressLevel, qualityLevel := qualityPresetLevels(c.quality)
 	encodings := []int32{
 		EncodingTight,
 		EncodingZRLE,
@@ -270,8 +271,8 @@ func (c *Client) sendSetEncodings() error {
 		EncodingRaw,
 		EncodingCursor,
 		EncodingDesktopSize,
-		encodingCompressLevel0 + wanCompressLevel,
-		encodingQualityLevel0 + wanQualityLevel,
+		encodingCompressLevel0 + int32(compressLevel),
+		encodingQualityLevel0 + int32(qualityLevel),
 	}
 
 	buf := make([]byte, 4+4*len(encodings))

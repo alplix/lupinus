@@ -49,6 +49,10 @@ type DialOptions struct {
 	// password. Ignored for every other security type: plain VNC
 	// Authentication has no concept of a username.
 	Username string
+	// Quality is one of "balanced" (default), "quality" or "bandwidth" —
+	// see qualityPresetLevels in types.go for exactly what each one asks
+	// the server for. An empty/unrecognized value behaves like "balanced".
+	Quality string
 	// DialTimeout bounds the initial TCP connect. Zero means no timeout.
 	DialTimeout time.Duration
 }
@@ -61,6 +65,7 @@ type Client struct {
 
 	width, height int
 	name          string
+	quality       string // see DialOptions.Quality
 
 	zr       io.ReadCloser
 	zrFeeder *chunkFeeder
@@ -96,6 +101,7 @@ func Dial(ctx context.Context, addr string, opts DialOptions) (*Client, error) {
 		r:        bufio.NewReaderSize(conn, 64*1024),
 		w:        conn,
 		zrFeeder: &chunkFeeder{},
+		quality:  opts.Quality,
 	}
 
 	if err := c.handshake(opts.Username, opts.Password); err != nil {

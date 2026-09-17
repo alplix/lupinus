@@ -171,6 +171,25 @@ func (a *App) SetTheme(theme string) error {
 	return a.store.SetTheme(theme)
 }
 
+// GetVNCQuality/SetVNCQuality control the compression/JPEG-quality hint
+// (see internal/rfb's qualityPresetLevels) VNC sessions advertise to the
+// server: "balanced" (default), "quality" (LAN, favor fidelity) or
+// "bandwidth" (slow/high-latency links, favor smaller updates). RDP has no
+// equivalent — its bitmap codec doesn't expose this kind of tunable.
+func (a *App) GetVNCQuality() string {
+	if a.store == nil {
+		return "balanced"
+	}
+	return a.store.VNCQuality()
+}
+
+func (a *App) SetVNCQuality(quality string) error {
+	if a.store == nil {
+		return fmt.Errorf("config store unavailable")
+	}
+	return a.store.SetVNCQuality(quality)
+}
+
 // ListTrustedCertificates returns every "host:port" address with an RDP
 // TLS certificate pinned via trust-on-first-use.
 func (a *App) ListTrustedCertificates() []string {
@@ -375,9 +394,14 @@ func (a *App) dialSession(ctx context.Context, protocol, addr, username, passwor
 			runFn:   func(sess *wsbridge.Session) error { return client.Run(ctx, sess) },
 		}, nil
 	default:
+		quality := "balanced"
+		if a.store != nil {
+			quality = a.store.VNCQuality()
+		}
 		client, err := rfb.Dial(ctx, addr, rfb.DialOptions{
 			Username:    username,
 			Password:    password,
+			Quality:     quality,
 			DialTimeout: 10 * time.Second,
 		})
 		if err != nil {
