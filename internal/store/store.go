@@ -23,8 +23,10 @@ const keyringService = "Lupinus"
 type Connection struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
+	Protocol string `json:"protocol,omitempty"` // "vnc" | "rdp" — empty means "vnc" (pre-v0.2.0 saves)
 	Host     string `json:"host"`
 	Port     int    `json:"port"`
+	Username string `json:"username,omitempty"` // RDP only
 	ColorTag string `json:"colorTag,omitempty"`
 	LastUsed string `json:"lastUsed,omitempty"` // RFC 3339, empty if never connected
 }

@@ -227,6 +227,7 @@ function renderConnCard(c) {
       <div class="conn-info">
         <div class="conn-name trunc">${esc(c.name || c.host)}</div>
         <div class="conn-meta">
+          <span class="protocol-tag">${esc((c.protocol || 'vnc').toUpperCase())}</span>
           <span class="num">${esc(c.host)}:${esc(String(c.port))}</span>
           <span>${esc(fmtLastUsed(c.lastUsed))}</span>
         </div>
@@ -362,9 +363,11 @@ function renderConnFormModal(m) {
   // On a validation error we re-render this modal from scratch — pull the
   // user's in-progress input back in instead of resetting to saved values.
   const d = m.draft
+  const protocol = d ? d.protocol : c?.protocol || 'vnc'
   const nameVal = d ? d.name : c?.name || ''
   const hostVal = d ? d.host : c?.host || ''
-  const portVal = d ? d.port : String(c?.port || 5900)
+  const portVal = d ? d.port : String(c?.port || defaultPortFor(protocol))
+  const userVal = d ? d.username : c?.username || ''
   const passVal = d ? d.password : ''
   return `
     <div class="modal-overlay">
@@ -374,6 +377,7 @@ function renderConnFormModal(m) {
           <button class="icon-btn" onclick="window._closeModal()">${CLOSE_ICON}</button>
         </div>
         ${m.error ? `<div class="modal-error">${esc(m.error)}</div>` : ''}
+        ${renderProtocolSelector('f', protocol)}
         <div class="field">
           <label>Name</label>
           <input id="f-name" value="${attr(nameVal)}" placeholder="My server">
@@ -388,6 +392,11 @@ function renderConnFormModal(m) {
             <input id="f-port" value="${attr(portVal)}" inputmode="numeric">
           </div>
         </div>
+        ${protocol === 'rdp' ? `
+        <div class="field">
+          <label>Username</label>
+          <input id="f-user" value="${attr(userVal)}" placeholder="Windows/RDP username">
+        </div>` : ''}
         <div class="field">
           <label>Password</label>
           <input id="f-pass" type="password" value="${attr(passVal)}" placeholder="${editing ? 'Leave blank to keep current' : 'Optional'}">
@@ -402,10 +411,31 @@ function renderConnFormModal(m) {
   `
 }
 
+function defaultPortFor(protocol) {
+  return protocol === 'rdp' ? 3389 : 5900
+}
+
+// A small VNC/RDP segmented control shared by the Add/Edit and Quick
+// Connect modals. Switching it re-renders the modal so the port default and
+// (for RDP) the username field update live.
+function renderProtocolSelector(prefix, protocol) {
+  return `
+    <div class="field">
+      <label>Protocol</label>
+      <div class="theme-options">
+        <button type="button" class="${protocol === 'vnc' ? 'active' : ''}" onclick="window._setModalProtocol('${prefix}', 'vnc')">VNC</button>
+        <button type="button" class="${protocol === 'rdp' ? 'active' : ''}" onclick="window._setModalProtocol('${prefix}', 'rdp')">RDP</button>
+      </div>
+    </div>
+  `
+}
+
 function renderQuickConnectModal(m) {
   const d = m.draft
+  const protocol = d ? d.protocol : 'vnc'
   const hostVal = d ? d.host : ''
-  const portVal = d ? d.port : '5900'
+  const portVal = d ? d.port : String(defaultPortFor(protocol))
+  const userVal = d ? d.username : ''
   const passVal = d ? d.password : ''
   return `
     <div class="modal-overlay">
@@ -415,6 +445,7 @@ function renderQuickConnectModal(m) {
           <button class="icon-btn" onclick="window._closeModal()">${CLOSE_ICON}</button>
         </div>
         ${m.error ? `<div class="modal-error">${esc(m.error)}</div>` : ''}
+        ${renderProtocolSelector('qc', protocol)}
         <div class="field-row">
           <div class="field">
             <label>Host</label>
@@ -425,6 +456,11 @@ function renderQuickConnectModal(m) {
             <input id="qc-port" value="${attr(portVal)}" inputmode="numeric">
           </div>
         </div>
+        ${protocol === 'rdp' ? `
+        <div class="field">
+          <label>Username</label>
+          <input id="qc-user" value="${attr(userVal)}" placeholder="Windows/RDP username">
+        </div>` : ''}
         <div class="field">
           <label>Password</label>
           <input id="qc-pass" type="password" value="${attr(passVal)}" placeholder="Optional">
@@ -448,6 +484,7 @@ function goToViewer(info) {
     token,
     connId: info.connId || null,
     name: info.name || '',
+    protocol: info.protocol || 'vnc',
     host: info.host,
     port: info.port,
     sessionId: null,
@@ -549,6 +586,7 @@ function mountViewerCanvas() {
   viewerHandle = openViewer({
     container,
     bridgeUrl: state.viewer.bridgeUrl,
+    protocol: state.viewer.protocol,
     onSocketState: () => {
       // Raw WebSocket open/close/error — the RFB-level lupinus:status event
       // is the authoritative source for the overlay/status bar, so this is
@@ -643,7 +681,7 @@ window._viewerClipboardSync = async () => {
 window._connect = async (id) => {
   const conn = state.connections.find((c) => c.id === id)
   if (!conn) return
-  const token = goToViewer({ connId: id, name: conn.name || conn.host, host: conn.host, port: conn.port })
+  const token = goToViewer({ connId: id, name: conn.name || conn.host, protocol: conn.protocol || 'vnc', host: conn.host, port: conn.port })
   try {
     const result = await Connect(id)
     if (state.viewer?.token !== token) {
@@ -672,21 +710,40 @@ window._openQuickConnect = () => {
   renderModal()
 }
 
+// Shared by both modals: switching the VNC/RDP segmented control snapshots
+// the currently-typed fields, flips the protocol, and — only if the port
+// still matches the previous protocol's default — swaps it to the new
+// protocol's default too, then re-renders (which shows/hides the Username
+// field for RDP).
+window._setModalProtocol = (prefix, protocol) => {
+  const host = $(`#${prefix}-host`)?.value.trim() || ''
+  const portRaw = $(`#${prefix}-port`)?.value.trim() || ''
+  const username = $(`#${prefix}-user`)?.value.trim() || ''
+  const password = $(`#${prefix}-pass`)?.value || ''
+  const prevProtocol = state.modal.draft?.protocol || (prefix === 'f' && state.modal.id ? state.connections.find((c) => c.id === state.modal.id)?.protocol : null) || 'vnc'
+  const port = portRaw === '' || parseInt(portRaw, 10) === defaultPortFor(prevProtocol) ? String(defaultPortFor(protocol)) : portRaw
+  const name = prefix === 'f' ? $('#f-name')?.value.trim() || '' : undefined
+  state.modal.draft = { protocol, name, host, port, username, password }
+  renderModal()
+}
+
 window._quickConnect = async () => {
+  const protocol = state.modal.draft?.protocol || 'vnc'
   const host = $('#qc-host').value.trim()
   const portRaw = $('#qc-port').value.trim()
   const port = parseInt(portRaw, 10)
+  const username = protocol === 'rdp' ? $('#qc-user').value.trim() : ''
   const password = $('#qc-pass').value
   if (!host || !Number.isFinite(port) || port <= 0) {
     state.modal.error = 'Host and a valid port are required.'
-    state.modal.draft = { host, port: portRaw, password }
+    state.modal.draft = { protocol, host, port: portRaw, username, password }
     renderModal()
     return
   }
   state.modal = null
-  const token = goToViewer({ connId: null, name: host, host, port })
+  const token = goToViewer({ connId: null, name: host, protocol, host, port })
   try {
-    const result = await QuickConnect(host, port, password)
+    const result = await QuickConnect(protocol, host, port, username, password)
     if (state.viewer?.token !== token) {
       try {
         await Disconnect(result.sessionId)
@@ -716,23 +773,27 @@ window._openEditConnection = (id) => {
 }
 
 window._saveConnection = async (id) => {
+  const existing = id ? state.connections.find((c) => c.id === id) : null
+  const protocol = state.modal.draft?.protocol || existing?.protocol || 'vnc'
   const name = $('#f-name').value.trim()
   const host = $('#f-host').value.trim()
   const portRaw = $('#f-port').value.trim()
   const port = parseInt(portRaw, 10)
+  const username = protocol === 'rdp' ? $('#f-user').value.trim() : ''
   const password = $('#f-pass').value
   if (!host || !Number.isFinite(port) || port <= 0) {
     state.modal.error = 'Host and a valid port are required.'
-    state.modal.draft = { name, host, port: portRaw, password }
+    state.modal.draft = { protocol, name, host, port: portRaw, username, password }
     renderModal()
     return
   }
-  const existing = id ? state.connections.find((c) => c.id === id) : null
   const conn = {
     id: id || '',
     name: name || host,
+    protocol,
     host,
     port,
+    username,
     colorTag: existing?.colorTag || '',
     lastUsed: existing?.lastUsed || '',
   }

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/alplix/lupinus/internal/rdp"
 	"github.com/alplix/lupinus/internal/rfb"
 	"github.com/alplix/lupinus/internal/store"
 	"github.com/alplix/lupinus/internal/version"
@@ -32,7 +33,6 @@ type App struct {
 }
 
 type liveSession struct {
-	client *rfb.Client
 	cancel context.CancelFunc
 }
 
@@ -243,46 +243,75 @@ func (a *App) Connect(id string) (ConnectResult, error) {
 	}
 	_ = a.store.TouchLastUsed(id)
 
-	return a.startSession(fmt.Sprintf("%s:%d", target.Host, target.Port), password)
+	protocol := target.Protocol
+	if protocol == "" {
+		protocol = "vnc"
+	}
+	return a.startSession(protocol, fmt.Sprintf("%s:%d", target.Host, target.Port), target.Username, password)
 }
 
 // QuickConnect starts a session without saving it.
-func (a *App) QuickConnect(host string, port int, password string) (ConnectResult, error) {
-	return a.startSession(fmt.Sprintf("%s:%d", host, port), password)
+func (a *App) QuickConnect(protocol, host string, port int, username, password string) (ConnectResult, error) {
+	return a.startSession(protocol, fmt.Sprintf("%s:%d", host, port), username, password)
 }
 
-func (a *App) startSession(addr, password string) (ConnectResult, error) {
+func (a *App) startSession(protocol, addr, username, password string) (ConnectResult, error) {
 	sessionID := uuid.NewString()
 	a.emitStatus(sessionID, "connecting", "")
 
 	ctx, cancel := context.WithCancel(a.ctx)
-	client, err := rfb.Dial(ctx, addr, rfb.DialOptions{
-		Password:    password,
-		DialTimeout: 10 * time.Second,
-	})
-	if err != nil {
-		cancel()
-		a.emitStatus(sessionID, "error", err.Error())
-		return ConnectResult{}, err
+
+	var (
+		input   wsbridge.InputSink
+		closeFn func() error
+		runFn   func(sess *wsbridge.Session) error
+	)
+
+	switch protocol {
+	case "rdp":
+		client, err := rdp.Dial(ctx, addr, rdp.DialOptions{
+			Username:      username,
+			Password:      password,
+			DialTimeoutMS: 10000,
+		})
+		if err != nil {
+			cancel()
+			a.emitStatus(sessionID, "error", err.Error())
+			return ConnectResult{}, err
+		}
+		input, closeFn = client, client.Close
+		runFn = func(sess *wsbridge.Session) error { return client.Run(ctx, sess) }
+	default:
+		client, err := rfb.Dial(ctx, addr, rfb.DialOptions{
+			Password:    password,
+			DialTimeout: 10 * time.Second,
+		})
+		if err != nil {
+			cancel()
+			a.emitStatus(sessionID, "error", err.Error())
+			return ConnectResult{}, err
+		}
+		input, closeFn = client, client.Close
+		runFn = func(sess *wsbridge.Session) error { return client.Run(ctx, sess) }
 	}
 
-	sess := a.bridge.NewSession(sessionID, client)
+	sess := a.bridge.NewSession(sessionID, input)
 
 	a.mu.Lock()
-	a.live[sessionID] = &liveSession{client: client, cancel: cancel}
+	a.live[sessionID] = &liveSession{cancel: cancel}
 	a.mu.Unlock()
 
 	a.emitStatus(sessionID, "connected", "")
 
 	go func() {
-		runErr := client.Run(ctx, sess)
+		runErr := runFn(sess)
 
 		a.mu.Lock()
 		delete(a.live, sessionID)
 		a.mu.Unlock()
 
 		a.bridge.CloseSession(sessionID)
-		client.Close()
+		closeFn()
 		cancelled := ctx.Err() != nil
 		cancel()
 

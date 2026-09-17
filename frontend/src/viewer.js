@@ -10,7 +10,8 @@
 //   Client -> server: 0x10 Pointer(x,y,buttonMask) ·
 //                      0x11 Key(keysym,down) · 0x12 Clipboard(text)
 
-import { keysymFor, SPECIAL_COMBOS } from './keysym.js';
+import { keysymFor, SPECIAL_COMBOS as VNC_SPECIAL_COMBOS } from './keysym.js';
+import { scancodeFor, SPECIAL_COMBOS as RDP_SPECIAL_COMBOS } from './rdp-scancode.js';
 
 const FRAME_INIT = 0x01;
 const FRAME_UPDATE = 0x02;
@@ -28,15 +29,19 @@ const FRAME_IN_CLIPBOARD = 0x12;
  * @param {Object} opts
  * @param {HTMLElement} opts.container - element the canvas is mounted into.
  * @param {string} opts.bridgeUrl - ws://127.0.0.1:PORT/fb?session=ID
+ * @param {'vnc'|'rdp'} [opts.protocol] - selects the keyboard mapping table
+ *   (X11 keysyms vs. PC/AT scancodes); defaults to 'vnc'.
  * @param {(state: 'open'|'closed'|'error', detail?: string) => void} [opts.onSocketState]
  * @param {(text: string) => void} [opts.onCutText] - server pushed clipboard text.
  * @returns {{ setScalingMode: (mode: 'fit'|'actual'|'stretch') => void,
  *             sendClipboard: (text: string) => void,
- *             sendSpecialCombo: (name: keyof typeof SPECIAL_COMBOS) => void,
+ *             sendSpecialCombo: (name: string) => void,
  *             requestFullscreen: () => void,
  *             close: () => void }}
  */
-export function openViewer({ container, bridgeUrl, onSocketState, onCutText }) {
+export function openViewer({ container, bridgeUrl, protocol = 'vnc', onSocketState, onCutText }) {
+	const keyFor = protocol === 'rdp' ? scancodeFor : keysymFor;
+	const SPECIAL_COMBOS = protocol === 'rdp' ? RDP_SPECIAL_COMBOS : VNC_SPECIAL_COMBOS;
 	const canvas = document.createElement('canvas');
 	canvas.className = 'lp-viewer-canvas';
 	canvas.tabIndex = 0;
@@ -249,14 +254,14 @@ export function openViewer({ container, bridgeUrl, onSocketState, onCutText }) {
 		ev.preventDefault();
 	}
 	function onKeyDown(ev) {
-		const ks = keysymFor(ev);
+		const ks = keyFor(ev);
 		if (ks !== null) {
 			sendKey(ks, true);
 			ev.preventDefault();
 		}
 	}
 	function onKeyUp(ev) {
-		const ks = keysymFor(ev);
+		const ks = keyFor(ev);
 		if (ks !== null) {
 			sendKey(ks, false);
 			ev.preventDefault();
