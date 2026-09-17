@@ -48,18 +48,6 @@ jobs:
             exit 1
           fi
 
-      - name: Frontend build
-        working-directory: frontend
-        run: |
-          npm install
-          npm run build
-
-      - name: Go vet
-        run: go vet ./...
-
-      - name: Go test
-        run: go test ./... -count=1
-
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 
@@ -68,5 +56,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
 
+      # Generates frontend/wailsjs (gitignored) and frontend/dist, both of
+      # which main.go's go:embed directives and frontend/src/main.js need —
+      # so this must run before Go vet/test, not just as a final check.
       - name: Wails build (linux/amd64 smoke test)
         run: wails build -platform linux/amd64 -clean
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: Go test
+        run: go test ./... -count=1
