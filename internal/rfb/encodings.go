@@ -14,6 +14,21 @@ func (c *Client) handleFramebufferUpdate(sink FramebufferSink) error {
 		return err
 	}
 
+	// Ask for the next update now, before decoding this one's rectangles
+	// — not after, like a naive request/process/request-again loop would.
+	// Mirrors TigerVNC's CConnection::framebufferUpdateStart. On a
+	// high-latency link (a VNC session run over the open internet rather
+	// than a LAN can easily see 100-300ms RTT) waiting until decode is
+	// finished to ask for more serializes local decode time behind an
+	// extra network round-trip on top of the unavoidable one, and the
+	// server can't start capturing its next frame until the request
+	// arrives — so every recoverable millisecond here directly shortens
+	// the visible lag between doing something on the remote screen and
+	// seeing it update.
+	if err := c.requestUpdate(true, 0, 0, c.width, c.height); err != nil {
+		return err
+	}
+
 	for i := 0; i < int(numRects); i++ {
 		x, err := readUint16(c.r)
 		if err != nil {

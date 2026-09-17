@@ -138,9 +138,6 @@ func (c *Client) Run(ctx context.Context, sink FramebufferSink) error {
 			if err := c.handleFramebufferUpdate(sink); err != nil {
 				return err
 			}
-			if err := c.requestUpdate(true, 0, 0, c.width, c.height); err != nil {
-				return err
-			}
 		case msgSetColourMapEntries:
 			if err := c.skipSetColourMapEntries(); err != nil {
 				return err
