@@ -27,16 +27,26 @@ const (
 // implements rfb.FramebufferSink (Init/Update/CopyRect/Resize/Cursor/
 // CutText below) so it can be handed directly to rfb.Client.Run.
 type Session struct {
-	id    string
-	input InputSink
+	id string
 
-	mu   sync.Mutex
-	conn *websocket.Conn
+	mu    sync.Mutex // guards input and conn
+	input InputSink
+	conn  *websocket.Conn
 
 	attachedCh chan struct{}
 	attachOnce sync.Once
 	closedCh   chan struct{}
 	closeOnce  sync.Once
+}
+
+// SetInput repoints outgoing pointer/keyboard/clipboard input at a new
+// live connection — used after auto-reconnect redials the server and gets
+// a new *rfb.Client/*rdp.Client, so input captured by the still-attached
+// browser tab reaches the new connection instead of the dead one.
+func (sess *Session) SetInput(input InputSink) {
+	sess.mu.Lock()
+	sess.input = input
+	sess.mu.Unlock()
 }
 
 func (sess *Session) attach(ctx context.Context, conn *websocket.Conn) {
@@ -59,6 +69,10 @@ func (sess *Session) attach(ctx context.Context, conn *websocket.Conn) {
 }
 
 func (sess *Session) handleInput(data []byte) {
+	sess.mu.Lock()
+	input := sess.input
+	sess.mu.Unlock()
+
 	switch data[0] {
 	case frameInPointer:
 		if len(data) < 6 {
@@ -67,14 +81,14 @@ func (sess *Session) handleInput(data []byte) {
 		x := int(binary.BigEndian.Uint16(data[1:3]))
 		y := int(binary.BigEndian.Uint16(data[3:5]))
 		mask := data[5]
-		_ = sess.input.SendPointerEvent(x, y, mask)
+		_ = input.SendPointerEvent(x, y, mask)
 	case frameInKey:
 		if len(data) < 6 {
 			return
 		}
 		keysym := binary.BigEndian.Uint32(data[1:5])
 		down := data[5] != 0
-		_ = sess.input.SendKeyEvent(keysym, down)
+		_ = input.SendKeyEvent(keysym, down)
 	case frameInClipboard:
 		if len(data) < 5 {
 			return
@@ -83,7 +97,7 @@ func (sess *Session) handleInput(data []byte) {
 		if uint32(len(data)) < 5+n {
 			return
 		}
-		_ = sess.input.SendClientCutText(string(data[5 : 5+n]))
+		_ = input.SendClientCutText(string(data[5 : 5+n]))
 	}
 }
 

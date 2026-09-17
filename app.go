@@ -255,18 +255,16 @@ func (a *App) QuickConnect(protocol, host string, port int, username, password s
 	return a.startSession(protocol, fmt.Sprintf("%s:%d", host, port), username, password)
 }
 
-func (a *App) startSession(protocol, addr, username, password string) (ConnectResult, error) {
-	sessionID := uuid.NewString()
-	a.emitStatus(sessionID, "connecting", "")
+// sessionConn bundles what one dial attempt (initial or reconnect)
+// produces: the input sink wsbridge routes browser events to, how to
+// close it, and its blocking Run loop.
+type sessionConn struct {
+	input   wsbridge.InputSink
+	closeFn func() error
+	runFn   func(sess *wsbridge.Session) error
+}
 
-	ctx, cancel := context.WithCancel(a.ctx)
-
-	var (
-		input   wsbridge.InputSink
-		closeFn func() error
-		runFn   func(sess *wsbridge.Session) error
-	)
-
+func dialSession(ctx context.Context, protocol, addr, username, password string) (sessionConn, error) {
 	switch protocol {
 	case "rdp":
 		client, err := rdp.Dial(ctx, addr, rdp.DialOptions{
@@ -275,27 +273,52 @@ func (a *App) startSession(protocol, addr, username, password string) (ConnectRe
 			DialTimeoutMS: 10000,
 		})
 		if err != nil {
-			cancel()
-			a.emitStatus(sessionID, "error", err.Error())
-			return ConnectResult{}, err
+			return sessionConn{}, err
 		}
-		input, closeFn = client, client.Close
-		runFn = func(sess *wsbridge.Session) error { return client.Run(ctx, sess) }
+		return sessionConn{
+			input:   client,
+			closeFn: client.Close,
+			runFn:   func(sess *wsbridge.Session) error { return client.Run(ctx, sess) },
+		}, nil
 	default:
 		client, err := rfb.Dial(ctx, addr, rfb.DialOptions{
 			Password:    password,
 			DialTimeout: 10 * time.Second,
 		})
 		if err != nil {
-			cancel()
-			a.emitStatus(sessionID, "error", err.Error())
-			return ConnectResult{}, err
+			return sessionConn{}, err
 		}
-		input, closeFn = client, client.Close
-		runFn = func(sess *wsbridge.Session) error { return client.Run(ctx, sess) }
+		return sessionConn{
+			input:   client,
+			closeFn: client.Close,
+			runFn:   func(sess *wsbridge.Session) error { return client.Run(ctx, sess) },
+		}, nil
+	}
+}
+
+// reconnectInitialDelay/MaxDelay bound the exponential backoff between
+// auto-reconnect attempts after an unexpected drop (network blip, server
+// restart) — never given up on outright; only an explicit Disconnect()
+// (which cancels ctx) stops the retry loop.
+const (
+	reconnectInitialDelay = 1 * time.Second
+	reconnectMaxDelay     = 30 * time.Second
+)
+
+func (a *App) startSession(protocol, addr, username, password string) (ConnectResult, error) {
+	sessionID := uuid.NewString()
+	a.emitStatus(sessionID, "connecting", "")
+
+	ctx, cancel := context.WithCancel(a.ctx)
+
+	conn, err := dialSession(ctx, protocol, addr, username, password)
+	if err != nil {
+		cancel()
+		a.emitStatus(sessionID, "error", err.Error())
+		return ConnectResult{}, err
 	}
 
-	sess := a.bridge.NewSession(sessionID, input)
+	sess := a.bridge.NewSession(sessionID, conn.input)
 
 	a.mu.Lock()
 	a.live[sessionID] = &liveSession{cancel: cancel}
@@ -304,21 +327,54 @@ func (a *App) startSession(protocol, addr, username, password string) (ConnectRe
 	a.emitStatus(sessionID, "connected", "")
 
 	go func() {
-		runErr := runFn(sess)
+		defer func() {
+			a.mu.Lock()
+			delete(a.live, sessionID)
+			a.mu.Unlock()
+			a.bridge.CloseSession(sessionID)
+			cancel()
+		}()
 
-		a.mu.Lock()
-		delete(a.live, sessionID)
-		a.mu.Unlock()
+		delay := reconnectInitialDelay
+		for {
+			runErr := conn.runFn(sess)
+			conn.closeFn()
 
-		a.bridge.CloseSession(sessionID)
-		closeFn()
-		cancelled := ctx.Err() != nil
-		cancel()
+			if ctx.Err() != nil {
+				a.emitStatus(sessionID, "disconnected", "")
+				return
+			}
+			if runErr == nil {
+				a.emitStatus(sessionID, "disconnected", "")
+				return
+			}
 
-		if runErr != nil && !cancelled {
-			a.emitStatus(sessionID, "error", runErr.Error())
-		} else {
-			a.emitStatus(sessionID, "disconnected", "")
+			a.emitStatus(sessionID, "reconnecting", runErr.Error())
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				a.emitStatus(sessionID, "disconnected", "")
+				return
+			}
+			if delay < reconnectMaxDelay {
+				delay *= 2
+				if delay > reconnectMaxDelay {
+					delay = reconnectMaxDelay
+				}
+			}
+
+			newConn, err := dialSession(ctx, protocol, addr, username, password)
+			if err != nil {
+				if ctx.Err() != nil {
+					a.emitStatus(sessionID, "disconnected", "")
+					return
+				}
+				continue // keep retrying at the current backoff
+			}
+			conn = newConn
+			sess.SetInput(conn.input)
+			delay = reconnectInitialDelay
+			a.emitStatus(sessionID, "connected", "")
 		}
 	}()
 
