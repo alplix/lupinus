@@ -84,7 +84,18 @@ jobs:
         # -tags webkit2_41: ubuntu-latest only ships libwebkit2gtk-4.1-dev
         # (4.0 was dropped from the distro); needed for the same
         # host-bindings-helper reason as the GTK packages above.
+        #
+        # 386 has no installer here: Wails' default project.nsi template
+        # only wires up amd64/arm64 (its architecture-select logic doesn't
+        # know about 386 at all), so -nsis fails outright for it —
+        # "cannot build nsis installer - no windows targets" — even
+        # though the plain binary itself compiles fine.
+        if: matrix.arch != '386'
         run: wails build -platform windows/${{ matrix.arch }} -tags webkit2_41 -clean -nsis -webview2 download
+
+      - name: Build (no installer)
+        if: matrix.arch == '386'
+        run: wails build -platform windows/386 -tags webkit2_41 -clean -webview2 download
 
       - name: Stage portable zip and installer
         working-directory: build/bin
@@ -94,12 +105,18 @@ jobs:
         run: |
           mv lupinus.exe lupinus-windows-${{ matrix.arch }}.exe
           zip -r ../../lupinus-windows-${{ matrix.arch }}.zip lupinus-windows-${{ matrix.arch }}.exe
-          mv Lupinus-${{ matrix.arch }}-installer.exe ../../lupinus-windows-${{ matrix.arch }}-setup.exe
+          if [ "${{ matrix.arch }}" != "386" ]; then
+            mv Lupinus-${{ matrix.arch }}-installer.exe ../../lupinus-windows-${{ matrix.arch }}-setup.exe
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: lupinus-windows-${{ matrix.arch }}
+          # 386 has no setup.exe (see above) — that path simply won't
+          # match anything for that job, which is fine: at least one of
+          # the two listed paths resolving is enough for upload-artifact
+          # not to treat it as "no files found".
           if-no-files-found: error
           path: |
             lupinus-windows-${{ matrix.arch }}.zip
@@ -185,6 +202,7 @@ jobs:
         run: |
           docker run --rm --platform linux/arm/v7 \
             -v "${{ github.workspace }}:/work" -w /work \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             golang:${{ env.GO_VERSION }}-bookworm bash -euxc '
               apt-get update
               apt-get install -y --no-install-recommends \
@@ -192,6 +210,7 @@ jobs:
               go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
               export PATH="$PATH:$(go env GOPATH)/bin"
               wails build -platform linux/arm -tags webkit2_41 -clean
+              chown -R "$HOST_UID:$HOST_GID" /work/build
             '
 
       - name: Stage archive
