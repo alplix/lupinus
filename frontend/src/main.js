@@ -81,13 +81,25 @@ const state = {
   about: null,
   modal: null, // { type: 'about' | 'connForm' | 'quickConnect', ...fields }
   toasts: [],
-  viewer: null, // populated while page === 'viewer', see goToViewer()
+  // Every simultaneously open session, not just one — the backend already
+  // supports concurrent sessions (app.go's `live` map), this is what makes
+  // that reachable from the UI. Each entry: { localId, sessionId, connId,
+  // name, protocol, host, port, bridgeUrl, status, message, scalingMode,
+  // cancelled }. `localId` is assigned client-side the instant a connect
+  // starts (before the backend has handed back a sessionId) and is stable
+  // for the entry's lifetime; `sessionId` fills in once Connect()/
+  // QuickConnect() resolves.
+  viewers: [],
+  activeViewerId: null, // localId of the viewer tab currently shown
 }
 
-let viewerHandle = null // handle returned by openViewer(), while mounted
-let viewerMounted = false // true once the canvas is live for state.viewer
-let viewerToken = 0 // guards against a stale Connect()/QuickConnect() reply
-// landing after the user has already navigated away from the viewer page
+// Per-session canvas/WebSocket handles, keyed by localId — deliberately
+// kept outside `state` since openViewer()'s return value and the DOM
+// container it owns aren't serializable render state. A session's entry
+// here persists for its whole lifetime so switching tabs never tears down
+// or reconnects a WebSocket, only shows/hides its container.
+const viewerHandles = new Map() // localId -> { handle, container }
+let pendingViewerCounter = 0
 
 // ==========================================================================
 // formatting helpers
@@ -156,14 +168,32 @@ function applyTheme(theme) {
 // ==========================================================================
 
 function render() {
-  if (state.page === 'viewer' && state.viewer) {
+  if (state.page === 'viewer' && state.viewers.length > 0) {
     renderViewerPage()
   } else {
-    viewerMounted = false
+    detachCanvasHost()
     renderShellPage()
   }
   renderModal()
   renderToasts()
+}
+
+// The persistent canvas host (see the `state.viewers`/`viewerHandles` doc
+// comment above) must be moved out of #view-root before renderShellPage()
+// overwrites its innerHTML — otherwise that rewrite would destroy every
+// open session's canvas and WebSocket along with it.
+function detachCanvasHost() {
+  const host = document.getElementById('viewer-canvas-host')
+  if (!host) return
+  host.style.display = 'none'
+  if (host.parentElement !== document.body) document.body.appendChild(host)
+}
+
+function attachCanvasHost(beforeEl) {
+  const host = document.getElementById('viewer-canvas-host')
+  if (!host || !beforeEl) return
+  beforeEl.parentElement.insertBefore(host, beforeEl)
+  host.style.display = ''
 }
 
 function navigate(page) {
@@ -191,6 +221,7 @@ function renderShellPage() {
           <button class="${state.page === 'settings' ? 'active' : ''}" onclick="window._nav('settings')">Settings</button>
         </nav>
         <div class="header-spacer"></div>
+        ${state.viewers.length > 0 ? `<button class="btn sm" onclick="window._viewerReturn()">${state.viewers.length} active session${state.viewers.length === 1 ? '' : 's'}</button>` : ''}
         <button class="icon-btn" title="About Lupinus" onclick="window._openAbout()">${INFO_ICON}</button>
       </header>
       <div class="page-root">
@@ -215,12 +246,13 @@ function mountCosmosStars() {
 // ---- connections page ----
 
 function statusClassFor(conn) {
-  if (state.viewer && state.viewer.connId === conn.id) return state.viewer.status
-  return 'disconnected'
+  const v = state.viewers.find((v) => v.connId === conn.id)
+  return v ? v.status : 'disconnected'
 }
 
 function renderConnCard(c) {
   const statusClass = statusClassFor(c)
+  const isLive = statusClass === 'connected' || statusClass === 'connecting' || statusClass === 'reconnecting'
   return `
     <div class="conn-card">
       <span class="status-dot ${esc(statusClass)}" title="${attr(statusLabel(statusClass))}"></span>
@@ -233,7 +265,7 @@ function renderConnCard(c) {
         </div>
       </div>
       <div class="conn-actions">
-        <button class="btn sm primary" onclick="window._connect('${attr(c.id)}')">Connect</button>
+        <button class="btn sm primary" onclick="window._connect('${attr(c.id)}')">${isLive ? 'View' : 'Connect'}</button>
         <button class="btn sm ghost" onclick="window._openEditConnection('${attr(c.id)}')">Edit</button>
         <button class="btn sm ghost danger" onclick="window._deleteConnection('${attr(c.id)}')">Delete</button>
       </div>
@@ -475,44 +507,113 @@ function renderQuickConnectModal(m) {
 }
 
 // ==========================================================================
-// viewer page
+// viewer page — supports multiple simultaneously open sessions. Each
+// session gets a persistent DOM slot (canvas + its own overlay) inside the
+// shared #viewer-canvas-host; only the active one's slot is visible, but
+// every open session keeps running (and its overlay stays accurate) in the
+// background. See the `state.viewers`/`viewerHandles` doc comment near the
+// top of this file for the full design.
 // ==========================================================================
 
-function goToViewer(info) {
-  const token = ++viewerToken
-  state.viewer = {
-    token,
-    connId: info.connId || null,
-    name: info.name || '',
-    protocol: info.protocol || 'vnc',
-    host: info.host,
-    port: info.port,
-    sessionId: null,
-    bridgeUrl: null,
-    status: 'connecting',
-    message: '',
-    scalingMode: 'fit',
+function activeViewer() {
+  return state.viewers.find((v) => v.localId === state.activeViewerId) || null
+}
+
+function createViewerSlot(v) {
+  const host = document.getElementById('viewer-canvas-host')
+  const slot = document.createElement('div')
+  slot.className = 'viewer-canvas-slot'
+  slot.dataset.localId = v.localId
+  const overlay = document.createElement('div')
+  overlay.className = 'viewer-overlay'
+  slot.appendChild(overlay)
+  host.appendChild(slot)
+  viewerHandles.set(v.localId, { handle: null, container: slot, overlayEl: overlay })
+}
+
+function showActiveSlot() {
+  const host = document.getElementById('viewer-canvas-host')
+  if (!host) return
+  for (const child of host.children) {
+    child.classList.toggle('active', child.dataset.localId === state.activeViewerId)
   }
-  viewerMounted = false
-  viewerHandle = null
-  state.page = 'viewer'
-  render()
-  return token
+}
+
+// Updates one session's overlay in place — safe to call for a background
+// (non-active) session too, so its overlay is already correct the instant
+// the user switches to it.
+function updateSlotOverlay(v) {
+  const entry = viewerHandles.get(v.localId)
+  if (!entry) return
+  const overlay = entry.overlayEl
+  if (v.status === 'connected') {
+    overlay.style.display = 'none'
+    overlay.innerHTML = ''
+    return
+  }
+  overlay.style.display = 'flex'
+  if (v.status === 'error') {
+    overlay.innerHTML = `
+      <h2>Connection failed</h2>
+      <p class="error-message">${esc(v.message || 'Could not connect to the server.')}</p>
+      <button class="btn primary sm" onclick="window._viewerClose('${attr(v.localId)}')">Close</button>
+    `
+  } else if (v.status === 'disconnected') {
+    overlay.innerHTML = `
+      <h2>Disconnected</h2>
+      <p>${esc(v.message || 'The session has ended.')}</p>
+      <button class="btn primary sm" onclick="window._viewerClose('${attr(v.localId)}')">Close</button>
+    `
+  } else {
+    overlay.innerHTML = `
+      <div class="spinner"></div>
+      <h2>${v.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</h2>
+      <p>${esc(`${v.host || ''}:${v.port || ''}`)}</p>
+    `
+  }
+}
+
+function renderViewerTabs() {
+  if (state.viewers.length <= 1) return ''
+  return `
+    <div class="viewer-tabs">
+      ${state.viewers
+        .map(
+          (v) => `
+        <button class="viewer-tab ${v.localId === state.activeViewerId ? 'active' : ''}" onclick="window._viewerSwitch('${attr(v.localId)}')">
+          <span class="status-dot ${esc(v.status)}"></span>
+          <span class="trunc">${esc(v.name || `${v.host}:${v.port}`)}</span>
+          <span class="viewer-tab-close" onclick="event.stopPropagation();window._viewerClose('${attr(v.localId)}')">${CLOSE_ICON}</span>
+        </button>
+      `
+        )
+        .join('')}
+    </div>
+  `
 }
 
 function renderViewerPage() {
-  if (viewerMounted) {
-    // The canvas + its live WebSocket already live inside #viewer-canvas-area
-    // — never rewrite the shell's innerHTML while mounted, only patch chrome.
-    updateViewerChrome()
+  const v = activeViewer()
+  if (!v) {
+    // Shouldn't happen (render() only takes this branch when
+    // state.viewers is non-empty), but fall back safely rather than
+    // render a broken shell.
+    detachCanvasHost()
+    renderShellPage()
     return
   }
+  // This function is called both via the top-level render() dispatch and
+  // directly (connect resolution, status events) while already on the
+  // viewer page — in the latter case the canvas host is already reparented
+  // inside the .viewer-shell markup about to be replaced below. Always
+  // pull it back out first so `root.innerHTML =` below never destroys a
+  // live session's canvas/WebSocket along with the chrome around it.
+  detachCanvasHost()
   const root = $('#view-root')
-  const v = state.viewer
   root.innerHTML = `
     <div class="viewer-shell">
       <div class="viewer-toolbar">
-        <button class="btn sm ghost" onclick="window._viewerLeave()">${BACK_ICON}Back</button>
+        <button class="btn sm ghost" onclick="window._viewerBack()">${BACK_ICON}Back</button>
         <span class="viewer-title trunc">${esc(v.name || `${v.host}:${v.port}`)}</span>
         <div class="spacer"></div>
         <select id="viewer-scaling" onchange="window._viewerSetScaling(this.value)">
@@ -523,70 +624,33 @@ function renderViewerPage() {
         <button class="btn sm" onclick="window._viewerClipboardSync()">Sync Clipboard</button>
         <button class="btn sm" onclick="window._viewerCtrlAltDel()">Ctrl+Alt+Del</button>
         <button class="btn sm" onclick="window._viewerFullscreen()">Fullscreen</button>
-        <button class="btn sm danger" onclick="window._viewerLeave()">Disconnect</button>
+        <button class="btn sm danger" onclick="window._viewerClose('${attr(v.localId)}')">Disconnect</button>
       </div>
-      <div class="viewer-canvas-area" id="viewer-canvas-area">
-        <div class="viewer-overlay" id="viewer-overlay"></div>
-      </div>
+      ${renderViewerTabs()}
       <div class="viewer-statusbar" id="viewer-statusbar"></div>
     </div>
   `
-  updateViewerChrome()
-}
-
-// Patches the overlay + status bar in place, without touching the mounted
-// canvas. Called on every lupinus:status event and connect resolution.
-function updateViewerChrome() {
-  const v = state.viewer
-  if (!v || state.page !== 'viewer') return
-
-  const overlay = $('#viewer-overlay')
-  if (overlay) {
-    if (v.status === 'connected') {
-      overlay.style.display = 'none'
-      overlay.innerHTML = ''
-    } else {
-      overlay.style.display = 'flex'
-      if (v.status === 'error') {
-        overlay.innerHTML = `
-          <h2>Connection failed</h2>
-          <p class="error-message">${esc(v.message || 'Could not connect to the server.')}</p>
-          <button class="btn primary sm" onclick="window._viewerLeave()">Back to Connections</button>
-        `
-      } else if (v.status === 'disconnected') {
-        overlay.innerHTML = `
-          <h2>Disconnected</h2>
-          <p>${esc(v.message || 'The session has ended.')}</p>
-          <button class="btn primary sm" onclick="window._viewerLeave()">Back to Connections</button>
-        `
-      } else {
-        overlay.innerHTML = `
-          <div class="spinner"></div>
-          <h2>${v.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</h2>
-          <p>${esc(`${v.host || ''}:${v.port || ''}`)}</p>
-        `
-      }
-    }
-  }
+  // Reinsert the persistent canvas host right before the status bar — a
+  // DOM move, not a rebuild, so every open session's canvas/WebSocket
+  // (including ones not currently active) survives untouched.
+  attachCanvasHost($('#viewer-statusbar'))
+  showActiveSlot()
 
   const statusbar = $('#viewer-statusbar')
-  if (statusbar) {
-    statusbar.innerHTML = `
-      <span class="status-dot ${esc(v.status)}"></span>
-      <span>${esc(statusLabel(v.status))}</span>
-      <span class="faint">· ${esc(`${v.host || ''}:${v.port || ''}`)}</span>
-    `
-  }
+  statusbar.innerHTML = `
+    <span class="status-dot ${esc(v.status)}"></span>
+    <span>${esc(statusLabel(v.status))}</span>
+    <span class="faint">· ${esc(`${v.host || ''}:${v.port || ''}`)}</span>
+  `
 }
 
-function mountViewerCanvas() {
-  if (viewerMounted || !state.viewer?.bridgeUrl) return
-  const container = $('#viewer-canvas-area')
-  if (!container) return
-  viewerHandle = openViewer({
-    container,
-    bridgeUrl: state.viewer.bridgeUrl,
-    protocol: state.viewer.protocol,
+function mountViewerCanvasFor(v) {
+  const entry = viewerHandles.get(v.localId)
+  if (!entry || entry.handle || !v.bridgeUrl) return
+  entry.handle = openViewer({
+    container: entry.container,
+    bridgeUrl: v.bridgeUrl,
+    protocol: v.protocol,
     onSocketState: () => {
       // Raw WebSocket open/close/error — the RFB-level lupinus:status event
       // is the authoritative source for the overlay/status bar, so this is
@@ -596,52 +660,113 @@ function mountViewerCanvas() {
       navigator.clipboard?.writeText?.(text).catch(() => {})
     },
   })
-  viewerMounted = true
 }
 
-function onConnectResolved(result) {
-  if (!state.viewer) return
-  state.viewer.sessionId = result.sessionId
-  state.viewer.bridgeUrl = result.bridgeUrl
-  if (state.viewer.status !== 'error') {
-    state.viewer.status = 'connected'
-    state.viewer.message = ''
+// Starts a new session: creates its viewer-state entry and DOM slot
+// immediately (so "Connecting…" shows right away), then wires up
+// connectPromise's resolution without blocking on it — multiple of these
+// can be in flight at once, each independent.
+function startConnect(info, connectPromise) {
+  const localId = 'v' + ++pendingViewerCounter
+  const v = {
+    localId,
+    sessionId: null,
+    connId: info.connId || null,
+    name: info.name || '',
+    protocol: info.protocol || 'vnc',
+    host: info.host,
+    port: info.port,
+    bridgeUrl: null,
+    status: 'connecting',
+    message: '',
+    scalingMode: 'fit',
+    cancelled: false,
   }
-  if (state.page === 'viewer') {
-    render() // first render after bridgeUrl is known — creates #viewer-canvas-area
-    mountViewerCanvas()
-    updateViewerChrome()
-  }
+  state.viewers.push(v)
+  state.activeViewerId = localId
+  state.page = 'viewer'
+  createViewerSlot(v)
+  updateSlotOverlay(v)
+  render()
+
+  connectPromise.then(
+    (result) => {
+      if (v.cancelled) {
+        Disconnect(result.sessionId).catch(() => {})
+        return
+      }
+      v.sessionId = result.sessionId
+      v.bridgeUrl = result.bridgeUrl
+      if (v.status !== 'error') {
+        v.status = 'connected'
+        v.message = ''
+      }
+      mountViewerCanvasFor(v)
+      updateSlotOverlay(v)
+      if (state.page === 'viewer') renderViewerPage()
+    },
+    (e) => {
+      if (v.cancelled) return
+      v.status = 'error'
+      v.message = (e && (e.message || e.toString())) || 'Connection failed'
+      updateSlotOverlay(v)
+      if (state.page === 'viewer') renderViewerPage()
+    }
+  )
+
+  return v
 }
 
-function onConnectFailed(e) {
-  if (!state.viewer) return
-  state.viewer.status = 'error'
-  state.viewer.message = (e && (e.message || e.toString())) || 'Connection failed'
-  updateViewerChrome()
-}
-
-async function teardownViewer() {
-  const sessionId = state.viewer?.sessionId
-  try {
-    viewerHandle?.close()
-  } catch {
-    /* already closed */
-  }
-  viewerHandle = null
-  viewerMounted = false
-  if (sessionId) {
+async function closeViewer(localId) {
+  const v = state.viewers.find((x) => x.localId === localId)
+  if (!v) return
+  v.cancelled = true
+  const entry = viewerHandles.get(localId)
+  if (entry) {
     try {
-      await Disconnect(sessionId)
+      entry.handle?.close()
+    } catch {
+      /* already closed */
+    }
+    entry.container.remove()
+    viewerHandles.delete(localId)
+  }
+  if (v.sessionId) {
+    try {
+      await Disconnect(v.sessionId)
     } catch {
       /* best effort */
     }
   }
+  state.viewers = state.viewers.filter((x) => x.localId !== localId)
+  if (state.activeViewerId === localId) {
+    state.activeViewerId = state.viewers.length ? state.viewers[state.viewers.length - 1].localId : null
+  }
 }
 
-window._viewerLeave = async () => {
-  await teardownViewer()
-  state.viewer = null
+window._viewerSwitch = (localId) => {
+  if (!state.viewers.find((v) => v.localId === localId)) return
+  state.activeViewerId = localId
+  render()
+}
+
+window._viewerClose = async (localId) => {
+  await closeViewer(localId)
+  if (state.viewers.length === 0) {
+    state.page = 'connections'
+  }
+  try {
+    state.connections = (await ListConnections()) || []
+  } catch {
+    /* keep the existing list on failure */
+  }
+  render()
+}
+
+// Leaves the viewer page WITHOUT disconnecting anything — open sessions
+// keep running in the background, reachable again via the header's
+// "N active sessions" button or by clicking a now-live connection's "View".
+window._viewerBack = async () => {
   state.page = 'connections'
   try {
     state.connections = (await ListConnections()) || []
@@ -651,23 +776,34 @@ window._viewerLeave = async () => {
   render()
 }
 
+window._viewerReturn = () => {
+  if (!state.viewers.length) return
+  if (!state.viewers.find((v) => v.localId === state.activeViewerId)) {
+    state.activeViewerId = state.viewers[state.viewers.length - 1].localId
+  }
+  state.page = 'viewer'
+  render()
+}
+
 window._viewerSetScaling = (mode) => {
-  if (state.viewer) state.viewer.scalingMode = mode
-  viewerHandle?.setScalingMode(mode)
+  const v = activeViewer()
+  if (!v) return
+  v.scalingMode = mode
+  viewerHandles.get(v.localId)?.handle?.setScalingMode(mode)
 }
 
 window._viewerFullscreen = () => {
-  viewerHandle?.requestFullscreen()
+  viewerHandles.get(state.activeViewerId)?.handle?.requestFullscreen()
 }
 
 window._viewerCtrlAltDel = () => {
-  viewerHandle?.sendSpecialCombo('ctrlAltDel')
+  viewerHandles.get(state.activeViewerId)?.handle?.sendSpecialCombo('ctrlAltDel')
 }
 
 window._viewerClipboardSync = async () => {
   try {
     const text = await navigator.clipboard.readText()
-    viewerHandle?.sendClipboard(text || '')
+    viewerHandles.get(state.activeViewerId)?.handle?.sendClipboard(text || '')
     toast('Clipboard synced', 'ok')
   } catch {
     toast('Clipboard access was denied', 'err')
@@ -681,27 +817,24 @@ window._viewerClipboardSync = async () => {
 window._connect = async (id) => {
   const conn = state.connections.find((c) => c.id === id)
   if (!conn) return
-  const token = goToViewer({ connId: id, name: conn.name || conn.host, protocol: conn.protocol || 'vnc', host: conn.host, port: conn.port })
+  // Already have a live (or connecting) session for this saved connection?
+  // Focus its tab instead of starting a duplicate.
+  const existing = state.viewers.find((v) => v.connId === id && !v.cancelled)
+  if (existing) {
+    state.activeViewerId = existing.localId
+    state.page = 'viewer'
+    render()
+    return
+  }
+  startConnect(
+    { connId: id, name: conn.name || conn.host, protocol: conn.protocol || 'vnc', host: conn.host, port: conn.port },
+    Connect(id)
+  )
   try {
-    const result = await Connect(id)
-    if (state.viewer?.token !== token) {
-      // User navigated away while this was in flight — clean up the
-      // orphaned session instead of surfacing it.
-      try {
-        await Disconnect(result.sessionId)
-      } catch {
-        /* best effort */
-      }
-      return
-    }
-    onConnectResolved(result)
-    try {
-      state.connections = (await ListConnections()) || []
-    } catch {
-      /* non-fatal */
-    }
-  } catch (e) {
-    if (state.viewer?.token === token) onConnectFailed(e)
+    state.connections = (await ListConnections()) || []
+    if (state.page !== 'viewer') render()
+  } catch {
+    /* non-fatal */
   }
 }
 
@@ -741,21 +874,7 @@ window._quickConnect = async () => {
     return
   }
   state.modal = null
-  const token = goToViewer({ connId: null, name: host, protocol, host, port })
-  try {
-    const result = await QuickConnect(protocol, host, port, username, password)
-    if (state.viewer?.token !== token) {
-      try {
-        await Disconnect(result.sessionId)
-      } catch {
-        /* best effort */
-      }
-      return
-    }
-    onConnectResolved(result)
-  } catch (e) {
-    if (state.viewer?.token === token) onConnectFailed(e)
-  }
+  startConnect({ connId: null, name: host, protocol, host, port }, QuickConnect(protocol, host, port, username, password))
 }
 
 // ==========================================================================
@@ -867,10 +986,13 @@ window._openSupport = async () => {
 // ==========================================================================
 
 function onStatusEvent(payload) {
-  if (!payload || !state.viewer || payload.sessionId !== state.viewer.sessionId) return
-  state.viewer.status = payload.state
-  state.viewer.message = payload.message || ''
-  updateViewerChrome()
+  if (!payload) return
+  const v = state.viewers.find((v) => v.sessionId === payload.sessionId)
+  if (!v) return
+  v.status = payload.state
+  v.message = payload.message || ''
+  updateSlotOverlay(v)
+  if (state.page === 'viewer') renderViewerPage()
 }
 
 async function init() {
@@ -879,6 +1001,15 @@ async function init() {
     <div id="modal-root"></div>
     <div id="toast-wrap" class="toast-wrap"></div>
   `
+  // Lives outside #view-root for the whole app lifetime — see the
+  // `state.viewers` doc comment: this is what lets a session's canvas and
+  // WebSocket survive both tab-switching and navigating away from the
+  // viewer page.
+  const canvasHost = document.createElement('div')
+  canvasHost.id = 'viewer-canvas-host'
+  canvasHost.className = 'viewer-canvas-host'
+  canvasHost.style.display = 'none'
+  document.body.appendChild(canvasHost)
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.modal) window._closeModal()

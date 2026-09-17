@@ -482,19 +482,71 @@ a.link:hover { text-decoration: underline; }
   background: var(--surface); color: var(--text); font-size: 12.5px; cursor: pointer;
 }
 
-.viewer-canvas-area {
+/* Host is a permanent element living outside #view-root (see main.js's
+   detachCanvasHost/attachCanvasHost) so its children's live WebSocket
+   connections and canvases survive both switching browser tabs between
+   simultaneously open sessions and navigating away from the viewer page
+   entirely — a session keeps running in the background until explicitly
+   closed. Each open session gets its own absolutely-stacked slot inside
+   it; only the active one is visible. */
+.viewer-canvas-host {
   flex: 1;
   min-height: 0;
   position: relative;
-  display: flex;
+}
+.viewer-canvas-slot {
+  position: absolute;
+  inset: 0;
+  display: none;
   align-items: center;
   justify-content: center;
   background: #000;
   overflow: auto;
 }
-.viewer-canvas-area .lp-viewer-canvas {
+.viewer-canvas-slot.active {
+  display: flex;
+}
+.viewer-canvas-slot .lp-viewer-canvas {
   display: block;
 }
+
+.viewer-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px 0;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.viewer-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.viewer-tab.active {
+  background: #000;
+  color: var(--text);
+}
+.viewer-tab-close {
+  display: inline-flex;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  color: var(--text-faint);
+}
+.viewer-tab-close:hover { color: var(--status-error); background: var(--surface-hover); }
+.viewer-tab-close svg { width: 100%; height: 100%; }
 
 .viewer-overlay {
   position: absolute; inset: 0; z-index: 5;
