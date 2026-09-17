@@ -48,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        arch: [amd64, arm64, '386']
     steps:
       - uses: actions/checkout@v4
 
@@ -160,15 +160,58 @@ jobs:
           if-no-files-found: error
           path: lupinus-linux-${{ matrix.arch }}.tar.gz
 
+  build-linux-arm:
+    name: Build linux arm (32-bit)
+    needs: [verify-version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: Build inside an emulated armv7 container
+        # Unlike riscv64 (dropped, unsupported by Wails itself — see the
+        # git history), "linux/arm" IS one of Wails' own supported
+        # -platform values, and Go/CGO both support armv7 — there's just
+        # no native 32-bit ARM GitHub-hosted runner and no ready cross
+        # toolchain with matching armhf GTK/webkit2gtk dev packages on
+        # the amd64 runners, so this builds natively inside a QEMU-
+        # emulated armv7 container instead, the same pattern that
+        # successfully built (just wasn't accepted by wails) for riscv64.
+        run: |
+          docker run --rm --platform linux/arm/v7 \
+            -v "${{ github.workspace }}:/work" -w /work \
+            golang:${{ env.GO_VERSION }}-bookworm bash -euxc '
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                nodejs npm libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+              go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+              export PATH="$PATH:$(go env GOPATH)/bin"
+              wails build -platform linux/arm -tags webkit2_41 -clean
+            '
+
+      - name: Stage archive
+        working-directory: build/bin
+        run: |
+          mv lupinus lupinus-linux-arm
+          tar -czf ../../lupinus-linux-arm.tar.gz lupinus-linux-arm
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lupinus-linux-arm
+          if-no-files-found: error
+          path: lupinus-linux-arm.tar.gz
+
   build-darwin:
-    name: Build darwin ${{ matrix.arch }}
+    name: Build darwin universal
     needs: [verify-version]
     runs-on: macos-latest
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
 
@@ -186,25 +229,28 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 
       - name: Build
-        run: wails build -platform darwin/${{ matrix.arch }} -clean
+        # A single fat (lipo-merged) binary covering both Apple Silicon
+        # and Intel Macs, instead of shipping two separate downloads —
+        # Wails builds each arch and merges them itself.
+        run: wails build -platform darwin/universal -clean
 
       - name: Stage archive
         working-directory: build/bin
         run: |
           APP="$(find . -maxdepth 1 -name '*.app' | head -1)"
           if [ -z "$APP" ]; then echo "No .app bundle produced"; exit 1; fi
-          ditto -c -k --keepParent "$APP" ../../lupinus-darwin-${{ matrix.arch }}.zip
+          ditto -c -k --keepParent "$APP" ../../lupinus-darwin-universal.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lupinus-darwin-${{ matrix.arch }}
+          name: lupinus-darwin-universal
           if-no-files-found: error
-          path: lupinus-darwin-${{ matrix.arch }}.zip
+          path: lupinus-darwin-universal.zip
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [build-windows, build-linux, build-darwin]
+    needs: [build-windows, build-linux, build-linux-arm, build-darwin]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
