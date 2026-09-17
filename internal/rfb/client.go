@@ -72,6 +72,12 @@ type Client struct {
 	tightZlib [4]tightZStream
 
 	writeMu sync.Mutex
+
+	// lastRequestSent, only maintained when debugFBWire (encodings.go) is
+	// on, lets the debug log show real request-to-response round-trip
+	// time — the number that actually tells "the network/server is slow"
+	// apart from "this client is slow to decode".
+	lastRequestSent time.Time
 }
 
 // Dial connects to addr (host:port) and performs the full RFB handshake:

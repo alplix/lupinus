@@ -47,6 +47,32 @@ const (
 	EncodingCursor              = -239 // pseudo-encoding
 	EncodingDesktopSize         = -223 // pseudo-encoding
 	EncodingExtendedDesktopSize = -308 // pseudo-encoding
+
+	// encodingCompressLevel0/encodingQualityLevel0 anchor the two
+	// TightVNC/TigerVNC-originated pseudo-encoding ranges a client uses to
+	// hint its bandwidth/quality tradeoff to the server: advertising
+	// encodingCompressLevel0+N (N=0..9, 0=fastest/least-compressed,
+	// 9=smallest/slowest) or encodingQualityLevel0+N (N=0..9,
+	// 0=lowest-fidelity JPEG, 9=highest) alongside the real encodings in
+	// SetEncodings. Without either hint a server has no idea whether it's
+	// talking to a client on the same LAN or across an ocean, and — based
+	// on live testing against real macOS Screen Sharing over a high-
+	// latency link — defaults to something far too large for that link.
+	encodingCompressLevel0 = -256
+	encodingQualityLevel0  = -32
+)
+
+// wanCompressLevel/wanQualityLevel are what sendSetEncodings actually
+// requests: fairly aggressive compression and a middling JPEG quality,
+// tuned for "works acceptably over a slow/high-latency WAN link" rather
+// than assuming a LAN — see encodingCompressLevel0's doc comment. Every
+// server this client has been tested against (TigerVNC, plus real macOS
+// Screen Sharing) is free to ignore either hint; there's no fallback
+// needed because both are optional pseudo-encodings, not a negotiated
+// requirement.
+const (
+	wanCompressLevel = 7
+	wanQualityLevel  = 5
 )
 
 // PixelFormat mirrors the 16-byte PIXEL_FORMAT structure. Lupinus always

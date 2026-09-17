@@ -1,11 +1,29 @@
 package rfb
 
-import "io"
+import (
+	"fmt"
+	"io"
+	"os"
+	"time"
+)
+
+// debugFBWire, gated by RFB_DEBUG_FB, prints one summary line per
+// FramebufferUpdate: how many rectangles, which encodings they used, how
+// many pixel bytes came over the wire, and how long the whole update took
+// to read+decode — the numbers needed to tell "the network is just slow"
+// apart from "this client is doing something inefficient" when someone
+// reports laggy updates, without having to guess.
+var debugFBWire = os.Getenv("RFB_DEBUG_FB") != ""
 
 // handleFramebufferUpdate reads the rectangle count and dispatches each
 // rectangle to the right decoder based on its encoding type. The
 // msgFramebufferUpdate type byte itself has already been consumed by Run.
 func (c *Client) handleFramebufferUpdate(sink FramebufferSink) error {
+	start := time.Now()
+	var roundTrip time.Duration
+	if debugFBWire && !c.lastRequestSent.IsZero() {
+		roundTrip = start.Sub(c.lastRequestSent)
+	}
 	if _, err := readFull(c.r, 1); err != nil { // padding
 		return err
 	}
@@ -29,6 +47,9 @@ func (c *Client) handleFramebufferUpdate(sink FramebufferSink) error {
 		return err
 	}
 
+	encCounts := map[int32]int{}
+	pixelArea := 0
+
 	for i := 0; i < int(numRects); i++ {
 		x, err := readUint16(c.r)
 		if err != nil {
@@ -51,6 +72,8 @@ func (c *Client) handleFramebufferUpdate(sink FramebufferSink) error {
 			return err
 		}
 		enc := int32(rawEnc)
+		encCounts[enc]++
+		pixelArea += int(w) * int(h)
 
 		switch enc {
 		case EncodingRaw:
@@ -84,7 +107,44 @@ func (c *Client) handleFramebufferUpdate(sink FramebufferSink) error {
 			return protoErrf("unsupported encoding %d", enc)
 		}
 	}
+
+	if debugFBWire {
+		fmt.Fprintf(os.Stderr, "DEBUG rfb update: rects=%d pixelArea=%d encodings=%v decodeTime=%s roundTrip=%s\n",
+			numRects, pixelArea, encodingCounts(encCounts), time.Since(start), roundTrip)
+	}
+
 	return nil
+}
+
+// encodingCounts renders the per-encoding rectangle tally with names
+// instead of raw numeric encoding IDs, for debugFBWire's log line.
+func encodingCounts(counts map[int32]int) map[string]int {
+	named := make(map[string]int, len(counts))
+	for enc, n := range counts {
+		named[encodingName(enc)] = n
+	}
+	return named
+}
+
+func encodingName(enc int32) string {
+	switch enc {
+	case EncodingRaw:
+		return "Raw"
+	case EncodingCopyRect:
+		return "CopyRect"
+	case EncodingZRLE:
+		return "ZRLE"
+	case EncodingTight:
+		return "Tight"
+	case EncodingCursor:
+		return "Cursor"
+	case EncodingDesktopSize:
+		return "DesktopSize"
+	case EncodingExtendedDesktopSize:
+		return "ExtendedDesktopSize"
+	default:
+		return fmt.Sprintf("0x%x", uint32(enc))
+	}
 }
 
 // fixAlpha overwrites every 4th byte (the unused padding channel in our

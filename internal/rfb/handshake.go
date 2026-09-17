@@ -270,6 +270,8 @@ func (c *Client) sendSetEncodings() error {
 		EncodingRaw,
 		EncodingCursor,
 		EncodingDesktopSize,
+		encodingCompressLevel0 + wanCompressLevel,
+		encodingQualityLevel0 + wanQualityLevel,
 	}
 
 	buf := make([]byte, 4+4*len(encodings))

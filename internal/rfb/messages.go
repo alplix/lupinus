@@ -1,5 +1,7 @@
 package rfb
 
+import "time"
+
 // requestUpdate sends a FramebufferUpdateRequest. incremental=false asks
 // for the full rectangle regardless of what's changed (used once at
 // startup); incremental=true (used for every request thereafter) asks the
@@ -22,6 +24,9 @@ func (c *Client) requestUpdate(incremental bool, x, y, w, h int) error {
 
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	if debugFBWire {
+		c.lastRequestSent = time.Now()
+	}
 	_, err := c.w.Write(buf)
 	return err
 }
