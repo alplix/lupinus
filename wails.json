@@ -8,7 +8,7 @@
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "wailsjsdir": "./frontend",
-  "nsisType": "installer",
+  "nsisType": "single",
   "author": {
     "name": "Alperen Yavuz",
     "email": "xalplix@gmail.com"
@@ -16,7 +16,7 @@
   "info": {
     "companyName": "alplix",
     "productName": "Lupinus",
-    "productVersion": "0.2.1",
+    "productVersion": "0.2.2",
     "copyright": "Copyright © 2026 Alperen Yavuz",
     "comments": "Lupinus - native VNC client for Windows, macOS and Linux"
   }
