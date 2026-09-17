@@ -55,6 +55,10 @@ func (s *logSink) Update(x, y, w, h int, rgba []byte) {
 	}
 }
 
+func (s *logSink) CopyRect(dstX, dstY, w, h, srcX, srcY int) {
+	s.t.Logf("CopyRect: (%d,%d) %dx%d <- (%d,%d)", dstX, dstY, w, h, srcX, srcY)
+}
+
 func (s *logSink) Resize(width, height int) {
 	s.t.Logf("Resize: %dx%d", width, height)
 }

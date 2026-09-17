@@ -13,12 +13,14 @@ import (
 
 // FramebufferSink receives decoded framebuffer events from a Client, from
 // the single goroutine running Client.Run. Deliberately the same method
-// shapes as rfb.FramebufferSink (minus CopyRect, unused in RDP v0.2.0) so
-// that wsbridge.Session — which already implements all of them — works
-// with either protocol client with zero changes; see the project plan.
+// shapes as rfb.FramebufferSink so that wsbridge.Session — which already
+// implements all of them — works with either protocol client with zero
+// changes; see the project plan. CopyRect is used by the ScrBlt/
+// MultiScrBlt GDI orders (orders.go) the same way VNC uses it.
 type FramebufferSink interface {
 	Init(width, height int, name string)
 	Update(x, y, w, h int, rgba []byte)
+	CopyRect(dstX, dstY, w, h, srcX, srcY int)
 	Resize(width, height int)
 	Cursor(hotspotX, hotspotY, w, h int, rgba []byte)
 	CutText(text string)
@@ -51,6 +53,11 @@ type Client struct {
 	// Virtual channel chunk reassembly (MS-RDPBCGR 2.2.6.1). Only one
 	// non-I/O channel exists (cliprdr), so a single buffer suffices.
 	vcBuf []byte
+
+	// GDI drawing order state (orders.go) — persists across PDUs since
+	// each order type's fields are individually delta-encoded against
+	// its own previous value, not reset per-update.
+	orderState orderState
 }
 
 // Dial connects to addr (host:port) and runs the full pre-session setup:

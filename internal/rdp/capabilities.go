@@ -163,9 +163,26 @@ func bitmapCapabilitySet() []byte {
 	return capSetHeader(capsBitmap, b.Bytes())
 }
 
-// orderCapabilitySet declares support for zero GDI drawing orders — every
-// server falls back to sending bitmap updates for a client shaped this
-// way, which is exactly what v0.2.0 wants (see the project plan).
+// Order Capability Set orderSupport array indices (MS-RDPBCGR 2.2.7.1.3) —
+// NOT the same numbering as the ORDER_TYPE_* wire values used inside the
+// order stream itself (orders.go); this is a separate per-order-type
+// TRUE/FALSE array indexed by its own TS_NEG_*_INDEX constants.
+const (
+	negDstBltIndex          = 0x00
+	negScrBltIndex          = 0x02
+	negOpaqueRectIndex      = 0x0A
+	negMultiDstBltIndex     = 0x0F
+	negMultiScrBltIndex     = 0x11
+	negMultiOpaqueRectIndex = 0x12
+)
+
+// orderCapabilitySet declares support for exactly the GDI drawing orders
+// orders.go can decode: DstBlt, ScrBlt, OpaqueRect, and their Multi*
+// variants — every other order type (PatBlt, MemBlt, glyphs/text, ...)
+// is left at FALSE, so a well-behaved server falls back to sending
+// bitmap updates for that content instead, same as v0.2.0's original
+// zero-orders baseline. See orders.go's doc comment for why this
+// particular subset.
 func orderCapabilitySet() []byte {
 	var b bytes.Buffer
 	b.Write(make([]byte, 16)) // terminalDescriptor
@@ -176,7 +193,13 @@ func orderCapabilitySet() []byte {
 	writeUint16LE(&b, 1)      // maximumOrderLevel
 	writeUint16LE(&b, 0)      // numberFonts
 	writeUint16LE(&b, 0x0022) // orderFlags: NEGOTIATEORDERSUPPORT | ZEROBOUNDSDELTASSUPPORT
-	b.Write(make([]byte, 32)) // orderSupport: all zero, no orders supported
+
+	orderSupport := make([]byte, 32)
+	for _, idx := range []int{negDstBltIndex, negScrBltIndex, negOpaqueRectIndex, negMultiDstBltIndex, negMultiScrBltIndex, negMultiOpaqueRectIndex} {
+		orderSupport[idx] = 1
+	}
+	b.Write(orderSupport)
+
 	writeUint16LE(&b, 0)      // textFlags
 	writeUint16LE(&b, 0)      // orderSupportExFlags
 	writeUint32LE(&b, 0)      // pad4octetsB

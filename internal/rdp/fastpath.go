@@ -82,7 +82,7 @@ func (c *Client) readFastPathUpdate(sink FramebufferSink) error {
 
 	r := &sliceReader{buf: body}
 	for r.pos < len(r.buf) {
-		if err := decodeFastPathUpdate(r, sink); err != nil {
+		if err := c.decodeFastPathUpdate(r, sink); err != nil {
 			return err
 		}
 	}
@@ -94,7 +94,7 @@ func (c *Client) readFastPathUpdate(sink FramebufferSink) error {
 // UPDATE entries) isn't implemented — every server actually observed
 // sends single-fragment updates in practice, and a fragmented update is
 // rejected with a clear error rather than silently corrupting the frame.
-func decodeFastPathUpdate(r *sliceReader, sink FramebufferSink) error {
+func (c *Client) decodeFastPathUpdate(r *sliceReader, sink FramebufferSink) error {
 	updateHeader, err := r.readUint8()
 	if err != nil {
 		return err
@@ -126,10 +126,12 @@ func decodeFastPathUpdate(r *sliceReader, sink FramebufferSink) error {
 	switch updateCode {
 	case fpUpdateBitmap:
 		return decodeBitmapUpdate(data, sink)
+	case fpUpdateOrders:
+		return c.decodeOrdersFastPath(data, sink)
 	default:
-		// Orders, palette, synchronize, pointer shapes/position, etc:
-		// not implemented in v0.2.0 (see the project plan) — safe to
-		// skip since we already consumed exactly `size` bytes.
+		// Palette, synchronize, pointer shapes/position, etc: not
+		// implemented in v0.2.0 (see the project plan) — safe to skip
+		// since we already consumed exactly `size` bytes.
 		return nil
 	}
 }

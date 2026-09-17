@@ -116,18 +116,31 @@ func (c *Client) handleSlowPathPDU(sink FramebufferSink) error {
 	payload := data[6+12:]
 
 	const pduType2Update = 2
+	const updateTypeOrders = 0
 	const updateTypeBitmap = 1
 	if pduType2 != pduType2Update {
-		return nil // orders/palette/control/etc: not implemented, safe to ignore
+		return nil // control/pointer/etc: not implemented, safe to ignore
 	}
 	if len(payload) < 2 {
 		return protoErrf("slow-path update PDU too short")
 	}
 	updateType := uint16(payload[0]) | uint16(payload[1])<<8
-	if updateType != updateTypeBitmap {
-		return nil
+	switch updateType {
+	case updateTypeBitmap:
+		return decodeBitmapUpdate(payload[2:], sink)
+	case updateTypeOrders:
+		// TS_UPDATE_ORDERS (slow-path form only — unlike Fast-Path, this
+		// carries 2+2 bytes of padding around numberOrders).
+		rest := payload[2:]
+		if len(rest) < 6 {
+			return protoErrf("slow-path orders update too short")
+		}
+		numberOrders := uint16(rest[2]) | uint16(rest[3])<<8
+		r := &sliceReader{buf: rest[6:]}
+		return c.decodeOrdersUpdate(r, int(numberOrders), sink)
+	default:
+		return nil // palette/etc: not implemented, safe to ignore
 	}
-	return decodeBitmapUpdate(payload[2:], sink)
 }
 
 // x224DataHeader is the fixed 3-byte X.224 Data (DT) TPDU header: length
