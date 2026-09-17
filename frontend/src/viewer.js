@@ -156,10 +156,24 @@ export function openViewer({ container, bridgeUrl, protocol = 'vnc', onSocketSta
 			canvas.style.height = '100%';
 			return;
 		}
-		// 'fit': scale to the container while preserving aspect ratio.
+		// 'fit': scale to the container while preserving aspect ratio. This
+		// is the default specifically so a server with a huge/Retina
+		// framebuffer (common connecting to macOS, which reports the
+		// physical pixel size — e.g. 2880x1800 on a 13" MacBook Pro, not
+		// the logical 1440x900) never shows "gigantic" the way many older
+		// VNC clients do when they default to 1:1 actual size.
 		const cw = container.clientWidth;
 		const ch = container.clientHeight;
-		const scale = Math.min(cw / fbWidth, ch / fbHeight, 1) || 1;
+		if (cw <= 0 || ch <= 0) {
+			// Container isn't laid out yet (e.g. this ran before the
+			// first paint). Bail without touching canvas size — falling
+			// back to a bogus scale of 1 here would briefly render at
+			// full native resolution, exactly the bug this mode exists
+			// to avoid. The ResizeObserver below re-invokes this as soon
+			// as the container gets a real size.
+			return;
+		}
+		const scale = Math.min(cw / fbWidth, ch / fbHeight, 1);
 		canvas.style.width = `${Math.round(fbWidth * scale)}px`;
 		canvas.style.height = `${Math.round(fbHeight * scale)}px`;
 	}
