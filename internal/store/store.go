@@ -36,6 +36,7 @@ type fileData struct {
 	Connections []Connection `json:"connections"`
 	Theme       string       `json:"theme"`                // "light" | "dark" | "system"
 	VNCQuality  string       `json:"vncQuality,omitempty"` // "balanced" | "quality" | "bandwidth" — see internal/rfb's DialOptions doc comment
+	Language    string       `json:"language,omitempty"`   // ISO 639-1 code matching one of frontend/src/locales/*.json; empty means "let the frontend auto-detect from the OS/webview locale"
 
 	// TrustedCerts implements trust-on-first-use for RDP's TLS layer,
 	// which almost always presents a self-signed certificate — there's no
@@ -207,6 +208,24 @@ func (s *Store) VNCQuality() string {
 func (s *Store) SetVNCQuality(quality string) error {
 	s.mu.Lock()
 	s.data.VNCQuality = quality
+	err := s.persistLocked()
+	s.mu.Unlock()
+	return err
+}
+
+// Language returns "" if nothing's been explicitly saved yet — unlike
+// Theme/VNCQuality, this has no hardcoded default: an empty result tells
+// the frontend to keep whatever it auto-detected from the OS/webview
+// locale instead of overriding it.
+func (s *Store) Language() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.data.Language
+}
+
+func (s *Store) SetLanguage(lang string) error {
+	s.mu.Lock()
+	s.data.Language = lang
 	err := s.persistLocked()
 	s.mu.Unlock()
 	return err

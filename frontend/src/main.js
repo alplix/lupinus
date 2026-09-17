@@ -1,5 +1,6 @@
 import './style.css'
 import { openViewer } from './viewer.js'
+import { t, tn, setLocale, detectLocale, currentLocaleCode, AVAILABLE_LOCALES } from './i18n.js'
 import {
   GetAbout,
   ListConnections,
@@ -9,6 +10,8 @@ import {
   SetTheme,
   GetVNCQuality,
   SetVNCQuality,
+  GetLanguage,
+  SetLanguage,
   Connect,
   QuickConnect,
   Disconnect,
@@ -114,25 +117,25 @@ let pendingViewerCounter = 0
 // ==========================================================================
 
 function fmtLastUsed(iso) {
-  if (!iso) return 'Never connected'
-  const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return 'Never connected'
-  const diff = (Date.now() - t) / 1000
-  if (diff < 60) return 'Just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
+  if (!iso) return t('connections.lastUsed.never')
+  const ts = new Date(iso).getTime()
+  if (Number.isNaN(ts)) return t('connections.lastUsed.never')
+  const diff = (Date.now() - ts) / 1000
+  if (diff < 60) return t('connections.lastUsed.justNow')
+  if (diff < 3600) return t('connections.lastUsed.minutes', { n: Math.floor(diff / 60) })
+  if (diff < 86400) return t('connections.lastUsed.hours', { n: Math.floor(diff / 3600) })
+  if (diff < 604800) return t('connections.lastUsed.days', { n: Math.floor(diff / 86400) })
   return new Date(iso).toLocaleDateString()
 }
 
 function statusLabel(s) {
   return (
     {
-      connected: 'Connected',
-      connecting: 'Connecting…',
-      reconnecting: 'Reconnecting…',
-      error: 'Connection error',
-      disconnected: 'Not connected',
+      connected: t('connections.status.connected'),
+      connecting: t('connections.status.connecting'),
+      reconnecting: t('connections.status.reconnecting'),
+      error: t('connections.status.error'),
+      disconnected: t('connections.status.disconnected'),
     }[s] || s
   )
 }
@@ -225,12 +228,12 @@ function renderShellPage() {
           <span class="brand-name">Lupinus</span>
         </div>
         <nav class="app-nav">
-          <button class="${state.page === 'connections' ? 'active' : ''}" onclick="window._nav('connections')">Connections</button>
-          <button class="${state.page === 'settings' ? 'active' : ''}" onclick="window._nav('settings')">Settings</button>
+          <button class="${state.page === 'connections' ? 'active' : ''}" onclick="window._nav('connections')">${t('nav.connections')}</button>
+          <button class="${state.page === 'settings' ? 'active' : ''}" onclick="window._nav('settings')">${t('nav.settings')}</button>
         </nav>
         <div class="header-spacer"></div>
-        ${state.viewers.length > 0 ? `<button class="btn sm" onclick="window._viewerReturn()">${state.viewers.length} active session${state.viewers.length === 1 ? '' : 's'}</button>` : ''}
-        <button class="icon-btn" title="About Lupinus" onclick="window._openAbout()">${INFO_ICON}</button>
+        ${state.viewers.length > 0 ? `<button class="btn sm" onclick="window._viewerReturn()">${tn('nav.activeSession', state.viewers.length)}</button>` : ''}
+        <button class="icon-btn" title="${attr(t('nav.aboutTooltip'))}" onclick="window._openAbout()">${INFO_ICON}</button>
       </header>
       <div class="page-root">
         ${state.page === 'connections' ? '<div class="cosmos-bg" id="cosmos-bg"></div>' : ''}
@@ -273,9 +276,9 @@ function renderConnCard(c) {
         </div>
       </div>
       <div class="conn-actions">
-        <button class="btn sm primary" onclick="window._connect('${attr(c.id)}')">${isLive ? 'View' : 'Connect'}</button>
-        <button class="btn sm ghost" onclick="window._openEditConnection('${attr(c.id)}')">Edit</button>
-        <button class="btn sm ghost danger" onclick="window._deleteConnection('${attr(c.id)}')">Delete</button>
+        <button class="btn sm primary" onclick="window._connect('${attr(c.id)}')">${isLive ? t('connections.view') : t('connections.connect')}</button>
+        <button class="btn sm ghost" onclick="window._openEditConnection('${attr(c.id)}')">${t('connections.edit')}</button>
+        <button class="btn sm ghost danger" onclick="window._deleteConnection('${attr(c.id)}')">${t('connections.delete')}</button>
       </div>
     </div>
   `
@@ -286,9 +289,9 @@ function renderEmptyState() {
     <div class="empty-state">
       <div class="brand-mark">${BRAND_MARK_SVG}</div>
       <div class="empty-wordmark">Lupinus</div>
-      <h2>No connections yet</h2>
-      <p>Connect to a VNC server to get started.</p>
-      <button class="btn primary" onclick="window._openAddConnection()">New Connection</button>
+      <h2>${t('connections.empty.title')}</h2>
+      <p>${t('connections.empty.body')}</p>
+      <button class="btn primary" onclick="window._openAddConnection()">${t('connections.empty.cta')}</button>
     </div>
   `
 }
@@ -297,17 +300,17 @@ function renderConnectionsPage() {
   const list = state.connections
   return `
     <div class="page-heading">
-      <h1>Connections</h1>
-      <p>${list.length} saved connection${list.length === 1 ? '' : 's'}</p>
+      <h1>${t('connections.heading')}</h1>
+      <p>${tn('connections.savedCount', list.length)}</p>
     </div>
     <div class="row" style="justify-content:flex-end;">
-      <button class="btn" onclick="window._openQuickConnect()">Quick Connect</button>
-      <button class="btn primary" onclick="window._openAddConnection()">+ New Connection</button>
+      <button class="btn" onclick="window._openQuickConnect()">${t('connections.quickConnect')}</button>
+      <button class="btn primary" onclick="window._openAddConnection()">${t('connections.newConnection')}</button>
     </div>
     ${list.length === 0 ? renderEmptyState() : `<div class="conn-list">${list.map(renderConnCard).join('')}</div>`}
     <footer class="app-footer">
-      <span class="footer-credit"><b>Lupinus</b> · Coded by Alperen Yavuz</span>
-      <a class="link" href="#" onclick="window._openSupport();return false;">Support Lupinus</a>
+      <span class="footer-credit"><b>Lupinus</b> · ${t('connections.footer.credit')}</span>
+      <a class="link" href="#" onclick="window._openSupport();return false;">${t('connections.footer.support')}</a>
     </footer>
   `
 }
@@ -319,49 +322,55 @@ function renderSettingsPage() {
   const vncQuality = state.vncQuality
   return `
     <div class="page-heading">
-      <h1>Settings</h1>
-      <p>Preferences for Lupinus</p>
+      <h1>${t('settings.heading')}</h1>
+      <p>${t('settings.subheading')}</p>
     </div>
     <div class="settings-card">
-      <h2>Appearance</h2>
+      <h2>${t('settings.appearance.title')}</h2>
       <div class="theme-options">
-        <button class="${theme === 'light' ? 'active' : ''}" onclick="window._setTheme('light')">Light</button>
-        <button class="${theme === 'dark' ? 'active' : ''}" onclick="window._setTheme('dark')">Dark</button>
-        <button class="${theme === 'system' ? 'active' : ''}" onclick="window._setTheme('system')">System</button>
+        <button class="${theme === 'light' ? 'active' : ''}" onclick="window._setTheme('light')">${t('settings.appearance.light')}</button>
+        <button class="${theme === 'dark' ? 'active' : ''}" onclick="window._setTheme('dark')">${t('settings.appearance.dark')}</button>
+        <button class="${theme === 'system' ? 'active' : ''}" onclick="window._setTheme('system')">${t('settings.appearance.system')}</button>
       </div>
     </div>
     <div class="settings-card">
-      <h2>VNC Quality</h2>
-      <p class="soft" style="margin:0 0 8px;font-size:13px;">How much VNC sessions favor image fidelity over update speed. RDP is unaffected — its codec doesn't have an equivalent tradeoff.</p>
-      <div class="theme-options">
-        <button class="${vncQuality === 'quality' ? 'active' : ''}" onclick="window._setVNCQuality('quality')">High quality (LAN)</button>
-        <button class="${vncQuality === 'balanced' ? 'active' : ''}" onclick="window._setVNCQuality('balanced')">Balanced</button>
-        <button class="${vncQuality === 'bandwidth' ? 'active' : ''}" onclick="window._setVNCQuality('bandwidth')">Low bandwidth (WAN)</button>
-      </div>
-      <p class="soft" style="margin:8px 0 0;font-size:12px;">Over a slow or high-latency link (a session run over the internet rather than a LAN), "Low bandwidth" trades some image fidelity for noticeably faster-feeling updates.</p>
+      <h2>${t('settings.language.title')}</h2>
+      <select id="language-select" onchange="window._setLanguage(this.value)">
+        ${AVAILABLE_LOCALES.map((l) => `<option value="${attr(l.code)}" ${l.code === currentLocaleCode() ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
+      </select>
     </div>
     <div class="settings-card">
-      <h2>Connections</h2>
-      <p class="soft" style="margin:0;font-size:13px;">Back up or move your saved connections between machines. Passwords are never included — they stay in this OS's credential store.</p>
+      <h2>${t('settings.quality.title')}</h2>
+      <p class="soft" style="margin:0 0 8px;font-size:13px;">${t('settings.quality.desc')}</p>
+      <div class="theme-options">
+        <button class="${vncQuality === 'quality' ? 'active' : ''}" onclick="window._setVNCQuality('quality')">${t('settings.quality.high')}</button>
+        <button class="${vncQuality === 'balanced' ? 'active' : ''}" onclick="window._setVNCQuality('balanced')">${t('settings.quality.balanced')}</button>
+        <button class="${vncQuality === 'bandwidth' ? 'active' : ''}" onclick="window._setVNCQuality('bandwidth')">${t('settings.quality.low')}</button>
+      </div>
+      <p class="soft" style="margin:8px 0 0;font-size:12px;">${t('settings.quality.hint')}</p>
+    </div>
+    <div class="settings-card">
+      <h2>${t('settings.connections.title')}</h2>
+      <p class="soft" style="margin:0;font-size:13px;">${t('settings.connections.desc')}</p>
       <div class="row">
-        <button class="btn sm" onclick="window._exportConnections()">Export…</button>
-        <button class="btn sm ghost" onclick="window._importConnections()">Import…</button>
+        <button class="btn sm" onclick="window._exportConnections()">${t('settings.connections.export')}</button>
+        <button class="btn sm ghost" onclick="window._importConnections()">${t('settings.connections.import')}</button>
       </div>
     </div>
     ${renderTrustedCertsCard()}
     <div class="settings-card">
-      <h2>About</h2>
-      <p class="soft" style="margin:0;font-size:13px;">Lupinus — Native VNC Client</p>
+      <h2>${t('settings.about.title')}</h2>
+      <p class="soft" style="margin:0;font-size:13px;">${t('settings.about.desc')}</p>
       <div class="row">
-        <button class="btn sm" onclick="window._openAbout()">About Lupinus</button>
-        <button class="btn sm ghost" onclick="window._openGitHub()">GitHub</button>
+        <button class="btn sm" onclick="window._openAbout()">${t('settings.about.aboutBtn')}</button>
+        <button class="btn sm ghost" onclick="window._openGitHub()">${t('settings.about.github')}</button>
       </div>
     </div>
     <div class="settings-card support-card">
       <div class="support-wordmark">Lupinus</div>
-      <div class="support-credit">Coded by Alperen Yavuz</div>
-      <div class="support-prompt">Enjoying Lupinus?<br>Support the project</div>
-      <button class="btn primary sm" onclick="window._openSupport()">Support Lupinus</button>
+      <div class="support-credit">${t('about.credit')}</div>
+      <div class="support-prompt">${t('settings.support.prompt')}</div>
+      <button class="btn primary sm" onclick="window._openSupport()">${t('settings.support.btn')}</button>
     </div>
   `
 }
@@ -376,15 +385,15 @@ function renderTrustedCertsCard() {
   if (state.trustedCerts.length === 0) return ''
   return `
     <div class="settings-card">
-      <h2>Trusted RDP Certificates</h2>
-      <p class="soft" style="margin:0;font-size:13px;">Pinned on first connect. If a server's certificate changes unexpectedly, Lupinus refuses to connect rather than trusting it silently — forget it here only if you're sure the change is legitimate.</p>
+      <h2>${t('settings.certs.title')}</h2>
+      <p class="soft" style="margin:0;font-size:13px;">${t('settings.certs.desc')}</p>
       <div class="trusted-cert-list">
         ${state.trustedCerts
           .map(
             (addr) => `
           <div class="trusted-cert-row">
             <span class="num trunc">${esc(addr)}</span>
-            <button class="btn sm ghost danger" onclick="window._forgetCertificate('${attr(addr)}')">Forget</button>
+            <button class="btn sm ghost danger" onclick="window._forgetCertificate('${attr(addr)}')">${t('settings.certs.forget')}</button>
           </div>
         `
           )
@@ -431,14 +440,14 @@ function renderAboutModal() {
         <div class="about-content">
           <div class="about-mark">${BRAND_MARK_SVG}</div>
           <div class="about-name">${esc(a.name || 'Lupinus')}</div>
-          <div class="about-subtitle">Native VNC Client</div>
-          <div class="about-line">Coded by Alperen Yavuz</div>
+          <div class="about-subtitle">${t('about.subtitle')}</div>
+          <div class="about-line">${t('about.credit')}</div>
           <div class="about-version">${a.version ? `v${esc(a.version)}` : ''}</div>
           <div class="about-actions">
-            <button class="btn sm" onclick="window._openGitHub()">GitHub</button>
-            <button class="btn sm primary" onclick="window._openSupport()">Support Lupinus</button>
+            <button class="btn sm" onclick="window._openGitHub()">${t('settings.about.github')}</button>
+            <button class="btn sm primary" onclick="window._openSupport()">${t('settings.support.btn')}</button>
           </div>
-          <div class="about-copyright">© 2026 Alperen Yavuz</div>
+          <div class="about-copyright">${t('about.copyright')}</div>
         </div>
       </div>
     </div>
@@ -464,13 +473,13 @@ function colorTagHex(key) {
 function renderColorTagPicker(prefix, selected) {
   return `
     <div class="field">
-      <label>Color Tag</label>
+      <label>${t('form.colorTag')}</label>
       <div class="colortag-picker" id="${prefix}-colortag-picker" data-value="${attr(selected)}">
         ${COLOR_TAGS.map(
-          (t) => `
-          <button type="button" class="colortag-swatch ${t.key === selected ? 'selected' : ''} ${t.hex ? '' : 'none'}"
-            data-key="${attr(t.key)}" style="${t.hex ? `background:${t.hex};` : ''}"
-            onclick="window._pickColorTag('${prefix}', '${attr(t.key)}')" title="${t.key || 'None'}"></button>
+          (tag) => `
+          <button type="button" class="colortag-swatch ${tag.key === selected ? 'selected' : ''} ${tag.hex ? '' : 'none'}"
+            data-key="${attr(tag.key)}" style="${tag.hex ? `background:${tag.hex};` : ''}"
+            onclick="window._pickColorTag('${prefix}', '${attr(tag.key)}')" title="${attr(tag.key || t('form.colorTagNone'))}"></button>
         `
         ).join('')}
       </div>
@@ -502,39 +511,39 @@ function renderConnFormModal(m) {
     <div class="modal-overlay">
       <div class="modal">
         <div class="modal-head">
-          <h3>${editing ? 'Edit Connection' : 'New Connection'}</h3>
+          <h3>${editing ? t('form.editTitle') : t('form.newTitle')}</h3>
           <button class="icon-btn" onclick="window._closeModal()">${CLOSE_ICON}</button>
         </div>
         ${m.error ? `<div class="modal-error">${esc(m.error)}</div>` : ''}
         ${renderProtocolSelector('f', protocol)}
         <div class="field">
-          <label>Name</label>
-          <input id="f-name" value="${attr(nameVal)}" placeholder="My server">
+          <label>${t('form.name')}</label>
+          <input id="f-name" value="${attr(nameVal)}" placeholder="${attr(t('form.namePlaceholder'))}">
         </div>
         <div class="field-row">
           <div class="field">
-            <label>Host</label>
-            <input id="f-host" value="${attr(hostVal)}" placeholder="192.168.1.10">
+            <label>${t('form.host')}</label>
+            <input id="f-host" value="${attr(hostVal)}" placeholder="${attr(t('form.hostPlaceholder'))}">
           </div>
           <div class="field" style="max-width:110px;">
-            <label>Port</label>
+            <label>${t('form.port')}</label>
             <input id="f-port" value="${attr(portVal)}" inputmode="numeric">
           </div>
         </div>
         <div class="field">
-          <label>Username</label>
-          <input id="f-user" value="${attr(userVal)}" placeholder="${usernamePlaceholderFor(protocol)}">
-          ${protocol === 'vnc' ? '<div class="field-hint">Only needed for macOS Screen Sharing’s account login mode — leave blank for a regular VNC password.</div>' : ''}
+          <label>${t('form.username')}</label>
+          <input id="f-user" value="${attr(userVal)}" placeholder="${attr(usernamePlaceholderFor(protocol))}">
+          ${protocol === 'vnc' ? `<div class="field-hint">${t('form.usernameHintVnc')}</div>` : ''}
         </div>
         <div class="field">
-          <label>Password</label>
-          <input id="f-pass" type="password" value="${attr(passVal)}" placeholder="${editing ? 'Leave blank to keep current' : 'Optional'}">
-          ${editing ? '<div class="field-hint">Leave blank to keep the stored credential.</div>' : ''}
+          <label>${t('form.password')}</label>
+          <input id="f-pass" type="password" value="${attr(passVal)}" placeholder="${attr(editing ? t('form.passwordPlaceholderEdit') : t('form.passwordPlaceholderNew'))}">
+          ${editing ? `<div class="field-hint">${t('form.passwordHintEdit')}</div>` : ''}
         </div>
         ${renderColorTagPicker('f', colorTagVal)}
         <div class="modal-foot">
-          <button class="btn" onclick="window._closeModal()">Cancel</button>
-          <button class="btn primary" onclick="window._saveConnection('${editing ? attr(m.id) : ''}')">${editing ? 'Save' : 'Add'}</button>
+          <button class="btn" onclick="window._closeModal()">${t('form.cancel')}</button>
+          <button class="btn primary" onclick="window._saveConnection('${editing ? attr(m.id) : ''}')">${editing ? t('form.save') : t('form.add')}</button>
         </div>
       </div>
     </div>
@@ -542,7 +551,7 @@ function renderConnFormModal(m) {
 }
 
 function usernamePlaceholderFor(protocol) {
-  return protocol === 'rdp' ? 'Windows/RDP username' : 'Optional — macOS Screen Sharing account login'
+  return protocol === 'rdp' ? t('form.usernamePlaceholderRdp') : t('form.usernamePlaceholderVnc')
 }
 
 function defaultPortFor(protocol) {
@@ -555,7 +564,7 @@ function defaultPortFor(protocol) {
 function renderProtocolSelector(prefix, protocol) {
   return `
     <div class="field">
-      <label>Protocol</label>
+      <label>${t('form.protocol')}</label>
       <div class="theme-options">
         <button type="button" class="${protocol === 'vnc' ? 'active' : ''}" onclick="window._setModalProtocol('${prefix}', 'vnc')">VNC</button>
         <button type="button" class="${protocol === 'rdp' ? 'active' : ''}" onclick="window._setModalProtocol('${prefix}', 'rdp')">RDP</button>
@@ -575,32 +584,32 @@ function renderQuickConnectModal(m) {
     <div class="modal-overlay">
       <div class="modal">
         <div class="modal-head">
-          <h3>Quick Connect</h3>
+          <h3>${t('form.quickConnectTitle')}</h3>
           <button class="icon-btn" onclick="window._closeModal()">${CLOSE_ICON}</button>
         </div>
         ${m.error ? `<div class="modal-error">${esc(m.error)}</div>` : ''}
         ${renderProtocolSelector('qc', protocol)}
         <div class="field-row">
           <div class="field">
-            <label>Host</label>
-            <input id="qc-host" value="${attr(hostVal)}" placeholder="192.168.1.10">
+            <label>${t('form.host')}</label>
+            <input id="qc-host" value="${attr(hostVal)}" placeholder="${attr(t('form.hostPlaceholder'))}">
           </div>
           <div class="field" style="max-width:110px;">
-            <label>Port</label>
+            <label>${t('form.port')}</label>
             <input id="qc-port" value="${attr(portVal)}" inputmode="numeric">
           </div>
         </div>
         <div class="field">
-          <label>Username</label>
-          <input id="qc-user" value="${attr(userVal)}" placeholder="${usernamePlaceholderFor(protocol)}">
+          <label>${t('form.username')}</label>
+          <input id="qc-user" value="${attr(userVal)}" placeholder="${attr(usernamePlaceholderFor(protocol))}">
         </div>
         <div class="field">
-          <label>Password</label>
-          <input id="qc-pass" type="password" value="${attr(passVal)}" placeholder="Optional">
+          <label>${t('form.password')}</label>
+          <input id="qc-pass" type="password" value="${attr(passVal)}" placeholder="${attr(t('form.passwordPlaceholderNew'))}">
         </div>
         <div class="modal-foot">
-          <button class="btn" onclick="window._closeModal()">Cancel</button>
-          <button class="btn primary" onclick="window._quickConnect()">Connect</button>
+          <button class="btn" onclick="window._closeModal()">${t('form.cancel')}</button>
+          <button class="btn primary" onclick="window._quickConnect()">${t('form.connect')}</button>
         </div>
       </div>
     </div>
@@ -655,20 +664,20 @@ function updateSlotOverlay(v) {
   overlay.style.display = 'flex'
   if (v.status === 'error') {
     overlay.innerHTML = `
-      <h2>Connection failed</h2>
-      <p class="error-message">${esc(v.message || 'Could not connect to the server.')}</p>
-      <button class="btn primary sm" onclick="window._viewerClose('${attr(v.localId)}')">Close</button>
+      <h2>${t('viewer.connectionFailed')}</h2>
+      <p class="error-message">${esc(v.message || t('viewer.connectionFailedDefault'))}</p>
+      <button class="btn primary sm" onclick="window._viewerClose('${attr(v.localId)}')">${t('viewer.close')}</button>
     `
   } else if (v.status === 'disconnected') {
     overlay.innerHTML = `
-      <h2>Disconnected</h2>
-      <p>${esc(v.message || 'The session has ended.')}</p>
-      <button class="btn primary sm" onclick="window._viewerClose('${attr(v.localId)}')">Close</button>
+      <h2>${t('viewer.disconnected')}</h2>
+      <p>${esc(v.message || t('viewer.disconnectedDefault'))}</p>
+      <button class="btn primary sm" onclick="window._viewerClose('${attr(v.localId)}')">${t('viewer.close')}</button>
     `
   } else {
     overlay.innerHTML = `
       <div class="spinner"></div>
-      <h2>${v.status === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</h2>
+      <h2>${v.status === 'reconnecting' ? t('viewer.reconnecting') : t('viewer.connecting')}</h2>
       <p>${esc(`${v.host || ''}:${v.port || ''}`)}</p>
     `
   }
@@ -714,18 +723,18 @@ function renderViewerPage() {
   root.innerHTML = `
     <div class="viewer-shell">
       <div class="viewer-toolbar">
-        <button class="btn sm ghost" onclick="window._viewerBack()">${BACK_ICON}Back</button>
+        <button class="btn sm ghost" onclick="window._viewerBack()">${BACK_ICON}${t('viewer.back')}</button>
         <span class="viewer-title trunc">${esc(v.name || `${v.host}:${v.port}`)}</span>
         <div class="spacer"></div>
         <select id="viewer-scaling" onchange="window._viewerSetScaling(this.value)">
-          <option value="fit" ${v.scalingMode === 'fit' ? 'selected' : ''}>Fit</option>
-          <option value="actual" ${v.scalingMode === 'actual' ? 'selected' : ''}>Actual size</option>
-          <option value="stretch" ${v.scalingMode === 'stretch' ? 'selected' : ''}>Stretch</option>
+          <option value="fit" ${v.scalingMode === 'fit' ? 'selected' : ''}>${t('viewer.fit')}</option>
+          <option value="actual" ${v.scalingMode === 'actual' ? 'selected' : ''}>${t('viewer.actual')}</option>
+          <option value="stretch" ${v.scalingMode === 'stretch' ? 'selected' : ''}>${t('viewer.stretch')}</option>
         </select>
-        <button class="btn sm" onclick="window._viewerClipboardSync()">Sync Clipboard</button>
-        <button class="btn sm" onclick="window._viewerCtrlAltDel()">Ctrl+Alt+Del</button>
-        <button class="btn sm" onclick="window._viewerFullscreen()">Fullscreen</button>
-        <button class="btn sm danger" onclick="window._viewerClose('${attr(v.localId)}')">Disconnect</button>
+        <button class="btn sm" onclick="window._viewerClipboardSync()">${t('viewer.syncClipboard')}</button>
+        <button class="btn sm" onclick="window._viewerCtrlAltDel()">${t('viewer.ctrlAltDel')}</button>
+        <button class="btn sm" onclick="window._viewerFullscreen()">${t('viewer.fullscreen')}</button>
+        <button class="btn sm danger" onclick="window._viewerClose('${attr(v.localId)}')">${t('viewer.disconnect')}</button>
       </div>
       ${renderViewerTabs()}
       <div class="viewer-statusbar" id="viewer-statusbar"></div>
@@ -809,7 +818,7 @@ function startConnect(info, connectPromise) {
     (e) => {
       if (v.cancelled) return
       v.status = 'error'
-      v.message = (e && (e.message || e.toString())) || 'Connection failed'
+      v.message = (e && (e.message || e.toString())) || t('toast.connectionFailedGeneric')
       updateSlotOverlay(v)
       if (state.page === 'viewer') renderViewerPage()
     }
@@ -905,9 +914,9 @@ window._viewerClipboardSync = async () => {
   try {
     const text = await navigator.clipboard.readText()
     viewerHandles.get(state.activeViewerId)?.handle?.sendClipboard(text || '')
-    toast('Clipboard synced', 'ok')
+    toast(t('toast.clipboardSynced'), 'ok')
   } catch {
-    toast('Clipboard access was denied', 'err')
+    toast(t('toast.clipboardDenied'), 'err')
   }
 }
 
@@ -972,7 +981,7 @@ window._quickConnect = async () => {
   const username = $('#qc-user').value.trim()
   const password = $('#qc-pass').value
   if (!host || !Number.isFinite(port) || port <= 0) {
-    state.modal.error = 'Host and a valid port are required.'
+    state.modal.error = t('form.validationHostPort')
     state.modal.draft = { protocol, host, port: portRaw, username, password }
     renderModal()
     return
@@ -1006,7 +1015,7 @@ window._saveConnection = async (id) => {
   const password = $('#f-pass').value
   const colorTag = document.getElementById('f-colortag-picker')?.dataset.value || ''
   if (!host || !Number.isFinite(port) || port <= 0) {
-    state.modal.error = 'Host and a valid port are required.'
+    state.modal.error = t('form.validationHostPort')
     state.modal.draft = { protocol, name, host, port: portRaw, username, password, colorTag }
     renderModal()
     return
@@ -1026,22 +1035,22 @@ window._saveConnection = async (id) => {
     state.connections = (await ListConnections()) || []
     state.modal = null
     render()
-    toast(id ? 'Connection updated' : 'Connection added', 'ok')
+    toast(id ? t('toast.connectionUpdated') : t('toast.connectionAdded'), 'ok')
   } catch (e) {
-    state.modal.error = (e && (e.message || e.toString())) || 'Could not save connection'
+    state.modal.error = (e && (e.message || e.toString())) || t('toast.saveConnectionFailed')
     renderModal()
   }
 }
 
 window._deleteConnection = async (id) => {
-  if (!confirm('Delete this connection?')) return
+  if (!confirm(t('toast.deleteConfirm'))) return
   try {
     await DeleteConnection(id)
     state.connections = state.connections.filter((c) => c.id !== id)
     render()
-    toast('Connection deleted', 'ok')
+    toast(t('toast.connectionDeleted'), 'ok')
   } catch (e) {
-    toast((e && (e.message || e.toString())) || 'Failed to delete connection', 'err')
+    toast((e && (e.message || e.toString())) || t('toast.deleteConnectionFailed'), 'err')
   }
 }
 
@@ -1056,7 +1065,7 @@ window._setTheme = async (theme) => {
   try {
     await SetTheme(theme)
   } catch {
-    toast('Could not save the theme preference', 'err')
+    toast(t('toast.themeSaveFailed'), 'err')
   }
 }
 
@@ -1069,16 +1078,26 @@ window._setVNCQuality = async (quality) => {
   try {
     await SetVNCQuality(quality)
   } catch {
-    toast('Could not save the VNC quality preference', 'err')
+    toast(t('toast.qualitySaveFailed'), 'err')
+  }
+}
+
+window._setLanguage = async (code) => {
+  setLocale(code)
+  render()
+  try {
+    await SetLanguage(code)
+  } catch {
+    toast(t('toast.languageSaveFailed'), 'err')
   }
 }
 
 window._exportConnections = async () => {
   try {
     const path = await ExportConnections()
-    if (path) toast(`Exported to ${path}`, 'ok')
+    if (path) toast(t('toast.exportedTo', { path }), 'ok')
   } catch (e) {
-    toast((e && (e.message || e.toString())) || 'Export failed', 'err')
+    toast((e && (e.message || e.toString())) || t('toast.exportFailed'), 'err')
   }
 }
 
@@ -1088,22 +1107,22 @@ window._importConnections = async () => {
     if (count > 0) {
       state.connections = (await ListConnections()) || []
       render()
-      toast(`Imported ${count} connection${count === 1 ? '' : 's'}`, 'ok')
+      toast(tn('toast.imported', count), 'ok')
     }
   } catch (e) {
-    toast((e && (e.message || e.toString())) || 'Import failed', 'err')
+    toast((e && (e.message || e.toString())) || t('toast.importFailed'), 'err')
   }
 }
 
 window._forgetCertificate = async (addr) => {
-  if (!confirm(`Forget the trusted certificate for ${addr}? The next connection will pin whatever certificate the server presents.`)) return
+  if (!confirm(t('toast.forgetCertConfirm', { addr }))) return
   try {
     await ForgetCertificate(addr)
     state.trustedCerts = (await ListTrustedCertificates()) || []
     render()
-    toast('Certificate forgotten', 'ok')
+    toast(t('toast.certForgotten'), 'ok')
   } catch (e) {
-    toast((e && (e.message || e.toString())) || 'Could not forget certificate', 'err')
+    toast((e && (e.message || e.toString())) || t('toast.forgetCertFailed'), 'err')
   }
 }
 
@@ -1169,6 +1188,12 @@ async function init() {
 
   EventsOn('lupinus:status', onStatusEvent)
 
+  // Set before the first render so nothing flashes in the wrong language:
+  // detectLocale() reads the OS/webview language synchronously (no Go
+  // round-trip needed), and the real saved preference — which wins once
+  // it arrives — is usually already cached from a prior launch anyway.
+  setLocale(detectLocale())
+
   // First paint follows the OS preference purely through CSS
   // (prefers-color-scheme) — no theme flash while GetTheme() is in flight.
   render()
@@ -1187,9 +1212,17 @@ async function init() {
   }
 
   try {
+    const lang = await GetLanguage()
+    if (lang) setLocale(lang)
+  } catch {
+    /* keep the OS-detected locale */
+  }
+  render()
+
+  try {
     state.connections = (await ListConnections()) || []
   } catch {
-    toast('Could not load saved connections', 'err')
+    toast(t('toast.loadConnectionsFailed'), 'err')
   }
   try {
     state.trustedCerts = (await ListTrustedCertificates()) || []

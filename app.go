@@ -190,6 +190,25 @@ func (a *App) SetVNCQuality(quality string) error {
 	return a.store.SetVNCQuality(quality)
 }
 
+// GetLanguage/SetLanguage control the UI language: an ISO 639-1 code
+// matching one of frontend/src/locales/*.json. GetLanguage returns ""
+// when nothing's been explicitly saved, which tells the frontend to keep
+// whatever it auto-detected from the OS/webview locale (see i18n.js's
+// detectLocale) rather than overriding it.
+func (a *App) GetLanguage() string {
+	if a.store == nil {
+		return ""
+	}
+	return a.store.Language()
+}
+
+func (a *App) SetLanguage(lang string) error {
+	if a.store == nil {
+		return fmt.Errorf("config store unavailable")
+	}
+	return a.store.SetLanguage(lang)
+}
+
 // ListTrustedCertificates returns every "host:port" address with an RDP
 // TLS certificate pinned via trust-on-first-use.
 func (a *App) ListTrustedCertificates() []string {
