@@ -1,9 +1,15 @@
 # Lupinus
 
-Native cross-platform VNC client.
+Native cross-platform VNC + RDP client.
 
-Lupinus connects to VNC servers and gives you a fast, native-feeling remote desktop viewer —
-no browser tab, no Electron, just a small native window built with **Go + [Wails v2](https://wails.io)**.
+Lupinus connects to VNC and RDP servers and gives you a fast, native-feeling remote desktop
+viewer — no browser tab, no Electron, just a small native window built with
+**Go + [Wails v2](https://wails.io)**.
+
+<p align="center">
+  <img src="docs/screenshots/connections.png" alt="Lupinus connection list, with saved VNC and RDP connections and color tags" width="620"><br>
+  <img src="docs/screenshots/live-session.png" alt="A live VNC session in Lupinus" width="620">
+</p>
 
 ## Features
 
