@@ -50,6 +50,10 @@ func (c *Client) handleFramebufferUpdate(sink FramebufferSink) error {
 			if err := c.decodeZRLE(sink, int(x), int(y), int(w), int(h)); err != nil {
 				return err
 			}
+		case EncodingTight:
+			if err := c.decodeTight(sink, int(x), int(y), int(w), int(h)); err != nil {
+				return err
+			}
 		case EncodingCursor:
 			if err := c.decodeCursor(sink, int(x), int(y), int(w), int(h)); err != nil {
 				return err

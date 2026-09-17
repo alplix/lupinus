@@ -36,6 +36,7 @@ const (
 const (
 	EncodingRaw                 = 0
 	EncodingCopyRect            = 1
+	EncodingTight               = 7
 	EncodingZRLE                = 16
 	EncodingCursor              = -239 // pseudo-encoding
 	EncodingDesktopSize         = -223 // pseudo-encoding

@@ -58,6 +58,12 @@ type Client struct {
 	zr       io.ReadCloser
 	zrFeeder *chunkFeeder
 
+	// Tight encoding (tight.go) uses up to 4 independent long-lived zlib
+	// streams, selected per-rectangle by the server and individually
+	// reset on the server's instruction — same continuous-stream
+	// requirement as ZRLE's single stream above, just four of them.
+	tightZlib [4]tightZStream
+
 	writeMu sync.Mutex
 }
 

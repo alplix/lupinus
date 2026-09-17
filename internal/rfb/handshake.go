@@ -245,6 +245,7 @@ func (c *Client) sendSetEncodings() error {
 	// in place and correct, it's just not negotiated. Multi-monitor/
 	// layout-aware resize is already a roadmap item, not v0.1.0 scope.
 	encodings := []int32{
+		EncodingTight,
 		EncodingZRLE,
 		EncodingCopyRect,
 		EncodingRaw,
