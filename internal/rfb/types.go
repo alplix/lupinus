@@ -7,11 +7,17 @@ package rfb
 
 import "fmt"
 
-// Security types (RFC 6143 §7.1.2).
+// Security types (RFC 6143 §7.1.2, plus Apple's registered extension).
 const (
 	secInvalid = 0
 	secNone    = 1
 	secVNCAuth = 2
+	// secARD is "Apple Remote Desktop": macOS's built-in Screen Sharing
+	// server offers this (sometimes alongside undocumented Apple variants
+	// 31-36 this client doesn't implement) whenever it's configured for
+	// real user-account login rather than a shared VNC password — see
+	// ard.go. Unlike secVNCAuth it needs a username, not just a password.
+	secARD = 30
 )
 
 // Client-to-server message types (RFC 6143 §7.5).

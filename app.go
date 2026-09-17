@@ -376,6 +376,7 @@ func (a *App) dialSession(ctx context.Context, protocol, addr, username, passwor
 		}, nil
 	default:
 		client, err := rfb.Dial(ctx, addr, rfb.DialOptions{
+			Username:    username,
 			Password:    password,
 			DialTimeout: 10 * time.Second,
 		})

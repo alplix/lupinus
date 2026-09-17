@@ -39,9 +39,16 @@ type FramebufferSink interface {
 
 // DialOptions configures a Client connection.
 type DialOptions struct {
-	// Password for VNC Authentication. Leave empty if the server offers
-	// (and Lupinus should accept) the None security type.
+	// Password for VNC Authentication or Apple Remote Desktop (secARD).
+	// Leave empty if the server offers (and Lupinus should accept) the
+	// None security type.
 	Password string
+	// Username for Apple Remote Desktop authentication (see ard.go) —
+	// macOS's Screen Sharing server requires this whenever it's set to
+	// log in as a real user account rather than accept a shared VNC
+	// password. Ignored for every other security type: plain VNC
+	// Authentication has no concept of a username.
+	Username string
 	// DialTimeout bounds the initial TCP connect. Zero means no timeout.
 	DialTimeout time.Duration
 }
@@ -85,7 +92,7 @@ func Dial(ctx context.Context, addr string, opts DialOptions) (*Client, error) {
 		zrFeeder: &chunkFeeder{},
 	}
 
-	if err := c.handshake(opts.Password); err != nil {
+	if err := c.handshake(opts.Username, opts.Password); err != nil {
 		conn.Close()
 		return nil, err
 	}

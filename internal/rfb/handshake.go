@@ -7,7 +7,7 @@ import (
 // handshake performs version negotiation, security (None or VNC
 // Authentication), ClientInit/ServerInit, and sends the initial
 // SetPixelFormat + SetEncodings. See RFC 6143 §7.1–7.4.
-func (c *Client) handshake(password string) error {
+func (c *Client) handshake(username, password string) error {
 	serverMajor, serverMinor, err := c.readProtocolVersion()
 	if err != nil {
 		return err
@@ -26,18 +26,26 @@ func (c *Client) handshake(password string) error {
 		return err
 	}
 
-	chosen, err := c.negotiateSecurity(major, minor, password)
+	chosen, err := c.negotiateSecurity(major, minor, username, password)
 	if err != nil {
 		return err
 	}
 
-	if chosen == secVNCAuth {
+	switch chosen {
+	case secVNCAuth:
 		if err := c.performVNCAuth(password); err != nil {
+			return err
+		}
+	case secARD:
+		if err := c.performARDAuth(username, password); err != nil {
 			return err
 		}
 	}
 
-	sendResult := chosen == secVNCAuth || (major == 3 && minor == 8)
+	// Unlike secNone, both secVNCAuth and secARD produce an actual
+	// authentication attempt the server reports success/failure on, even
+	// under RFB 3.7 (which otherwise skips SecurityResult entirely).
+	sendResult := chosen == secVNCAuth || chosen == secARD || (major == 3 && minor == 8)
 	if sendResult {
 		result, err := readUint32(c.r)
 		if err != nil {
@@ -88,7 +96,7 @@ func (c *Client) readProtocolVersion() (major, minor int, err error) {
 	return major, minor, nil
 }
 
-func (c *Client) negotiateSecurity(major, minor int, password string) (uint8, error) {
+func (c *Client) negotiateSecurity(major, minor int, username, password string) (uint8, error) {
 	if major == 3 && minor == 3 {
 		// RFB 3.3: the server dictates the security type directly.
 		secType, err := readUint32(c.r)
@@ -136,6 +144,17 @@ func (c *Client) negotiateSecurity(major, minor int, password string) (uint8, er
 		if t == secVNCAuth && password != "" {
 			chosen = secVNCAuth
 			break
+		}
+	}
+	if chosen == 0 {
+		// Servers that require a real user-account login (rather than a
+		// shared VNC password) — chiefly macOS's built-in Screen Sharing
+		// — offer only secARD, no secVNCAuth. See ard.go.
+		for _, t := range offered {
+			if t == secARD && (username != "" || password != "") {
+				chosen = secARD
+				break
+			}
 		}
 	}
 	if chosen == 0 {

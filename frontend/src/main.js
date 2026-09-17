@@ -507,11 +507,11 @@ function renderConnFormModal(m) {
             <input id="f-port" value="${attr(portVal)}" inputmode="numeric">
           </div>
         </div>
-        ${protocol === 'rdp' ? `
         <div class="field">
           <label>Username</label>
-          <input id="f-user" value="${attr(userVal)}" placeholder="Windows/RDP username">
-        </div>` : ''}
+          <input id="f-user" value="${attr(userVal)}" placeholder="${usernamePlaceholderFor(protocol)}">
+          ${protocol === 'vnc' ? '<div class="field-hint">Only needed for macOS Screen Sharing’s account login mode — leave blank for a regular VNC password.</div>' : ''}
+        </div>
         <div class="field">
           <label>Password</label>
           <input id="f-pass" type="password" value="${attr(passVal)}" placeholder="${editing ? 'Leave blank to keep current' : 'Optional'}">
@@ -525,6 +525,10 @@ function renderConnFormModal(m) {
       </div>
     </div>
   `
+}
+
+function usernamePlaceholderFor(protocol) {
+  return protocol === 'rdp' ? 'Windows/RDP username' : 'Optional — macOS Screen Sharing account login'
 }
 
 function defaultPortFor(protocol) {
@@ -572,11 +576,10 @@ function renderQuickConnectModal(m) {
             <input id="qc-port" value="${attr(portVal)}" inputmode="numeric">
           </div>
         </div>
-        ${protocol === 'rdp' ? `
         <div class="field">
           <label>Username</label>
-          <input id="qc-user" value="${attr(userVal)}" placeholder="Windows/RDP username">
-        </div>` : ''}
+          <input id="qc-user" value="${attr(userVal)}" placeholder="${usernamePlaceholderFor(protocol)}">
+        </div>
         <div class="field">
           <label>Password</label>
           <input id="qc-pass" type="password" value="${attr(passVal)}" placeholder="Optional">
@@ -930,8 +933,10 @@ window._openQuickConnect = () => {
 // Shared by both modals: switching the VNC/RDP segmented control snapshots
 // the currently-typed fields, flips the protocol, and — only if the port
 // still matches the previous protocol's default — swaps it to the new
-// protocol's default too, then re-renders (which shows/hides the Username
-// field for RDP).
+// protocol's default too, then re-renders (which updates the Username
+// field's placeholder/hint for the new protocol — the field itself is
+// always shown, since VNC needs it too for macOS Screen Sharing's
+// account-login mode, see usernamePlaceholderFor).
 window._setModalProtocol = (prefix, protocol) => {
   const host = $(`#${prefix}-host`)?.value.trim() || ''
   const portRaw = $(`#${prefix}-port`)?.value.trim() || ''
@@ -950,7 +955,7 @@ window._quickConnect = async () => {
   const host = $('#qc-host').value.trim()
   const portRaw = $('#qc-port').value.trim()
   const port = parseInt(portRaw, 10)
-  const username = protocol === 'rdp' ? $('#qc-user').value.trim() : ''
+  const username = $('#qc-user').value.trim()
   const password = $('#qc-pass').value
   if (!host || !Number.isFinite(port) || port <= 0) {
     state.modal.error = 'Host and a valid port are required.'
@@ -983,7 +988,7 @@ window._saveConnection = async (id) => {
   const host = $('#f-host').value.trim()
   const portRaw = $('#f-port').value.trim()
   const port = parseInt(portRaw, 10)
-  const username = protocol === 'rdp' ? $('#f-user').value.trim() : ''
+  const username = $('#f-user').value.trim()
   const password = $('#f-pass').value
   const colorTag = document.getElementById('f-colortag-picker')?.dataset.value || ''
   if (!host || !Number.isFinite(port) || port <= 0) {
