@@ -1,0 +1,191 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.26'
+  NODE_VERSION: '20'
+  WAILS_VERSION: 'v2.15.0'
+  APP_ID: dev.alplix.lupinus
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify-version:
+    name: Verify version sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check wails.json / frontend/package.json match internal/version/version.go
+        run: |
+          node scripts/sync-version.mjs
+          if ! git diff --exit-code; then
+            echo "::error::wails.json / frontend/package.json are out of sync with internal/version/version.go. Run 'node scripts/sync-version.mjs', commit, and re-tag."
+            exit 1
+          fi
+
+  build-windows:
+    name: Build windows/amd64
+    needs: [verify-version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install mingw and nsis
+        run: sudo apt-get update && sudo apt-get install -y mingw-w64 nsis
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Build (NSIS installer)
+        run: wails build -platform windows/amd64 -clean -nsis -webview2 download
+
+      - name: Stage portable zip
+        working-directory: build/bin
+        run: |
+          mv lupinus.exe lupinus-windows-amd64.exe
+          zip -r ../../lupinus-windows-amd64.zip lupinus-windows-amd64.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lupinus-windows-amd64
+          if-no-files-found: error
+          path: |
+            lupinus-windows-amd64.zip
+            build/bin/lupinus-amd64-installer.exe
+
+  build-linux:
+    name: Build linux ${{ matrix.arch }}
+    needs: [verify-version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install GTK dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Build
+        run: wails build -platform linux/${{ matrix.arch }} -clean
+
+      - name: Stage archive
+        working-directory: build/bin
+        run: |
+          mv lupinus lupinus-linux-${{ matrix.arch }}
+          tar -czf ../../lupinus-linux-${{ matrix.arch }}.tar.gz lupinus-linux-${{ matrix.arch }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lupinus-linux-${{ matrix.arch }}
+          if-no-files-found: error
+          path: lupinus-linux-${{ matrix.arch }}.tar.gz
+
+  build-darwin:
+    name: Build darwin ${{ matrix.arch }}
+    needs: [verify-version]
+    runs-on: macos-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Build
+        run: wails build -platform darwin/${{ matrix.arch }} -clean
+
+      - name: Stage archive
+        working-directory: build/bin
+        run: |
+          APP="$(find . -maxdepth 1 -name '*.app' | head -1)"
+          if [ -z "$APP" ]; then echo "No .app bundle produced"; exit 1; fi
+          ditto -c -k --keepParent "$APP" ../../lupinus-darwin-${{ matrix.arch }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lupinus-darwin-${{ matrix.arch }}
+          if-no-files-found: error
+          path: lupinus-darwin-${{ matrix.arch }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build-windows, build-linux, build-darwin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**
+          generate_release_notes: true

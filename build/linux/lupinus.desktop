@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Lupinus
+Comment=Native VNC Client
+Exec=lupinus
+Icon=lupinus
+Terminal=false
+Categories=Network;RemoteAccess;
+StartupWMClass=lupinus

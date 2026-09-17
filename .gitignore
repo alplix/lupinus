@@ -1,0 +1,24 @@
+# Build output
+/build/bin/
+
+# Go
+*.exe~
+*.test
+*.out
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/wailsjs/
+frontend/package.json.md5
+
+# Local config
+*.local.json
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

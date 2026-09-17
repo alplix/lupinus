@@ -1,0 +1,23 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Lupinus",
+  "outputfilename": "lupinus",
+  "frontend:dir": "frontend",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "wailsjsdir": "./frontend",
+  "nsisType": "installer",
+  "author": {
+    "name": "Alperen Yavuz",
+    "email": "xalplix@gmail.com"
+  },
+  "info": {
+    "companyName": "alplix",
+    "productName": "Lupinus",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright © 2026 Alperen Yavuz",
+    "comments": "Lupinus - native VNC client for Windows, macOS and Linux"
+  }
+}

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Lupinus app mark.
+
+  A lupinus (lupine) flower spike rising from a stem, with a crescent moon
+  and a small star accent — a "night bloom" mark for a remote-access tool
+  you reach for after hours. Built from a handful of overlapping circles so
+  the silhouette stays readable even rasterized down to 16x16 (see
+  build/gen_icon.go, which redraws this same mark procedurally for every
+  platform icon format).
+
+  Palette: Deep Violet (ground), Nebula Purple (stem), Lupinus Violet /
+  Sakura Pink (spike, dark-to-light bottom-to-top), Moonlight (moon + bud),
+  Soft Sakura (star).
+-->
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- ground -->
+  <rect x="8" y="8" width="240" height="240" rx="48" ry="48" fill="#151024"/>
+
+  <!-- crescent moon (circle minus an offset cut of the ground color) -->
+  <circle cx="186" cy="64" r="34" fill="#EDE9FF"/>
+  <circle cx="200" cy="56" r="30" fill="#151024"/>
+
+  <!-- star accent, a small 4-point sparkle -->
+  <polygon fill="#F7C4DE" points="140,18 146,30 158,36 146,42 140,54 134,42 122,36 134,30"/>
+
+  <!-- stem -->
+  <rect x="98" y="205" width="12" height="30" rx="6" ry="6" fill="#24163D"/>
+
+  <!-- flower spike: overlapping blooms tapering from violet at the base
+       to sakura pink at the tip, topped with a small moonlit bud -->
+  <circle cx="104" cy="205" r="34" fill="#7C5CFF"/>
+  <circle cx="104" cy="178" r="30" fill="#7C5CFF"/>
+  <circle cx="104" cy="152" r="26" fill="#7C5CFF"/>
+  <circle cx="104" cy="128" r="22" fill="#F29BCB"/>
+  <circle cx="104" cy="106" r="18" fill="#F29BCB"/>
+  <circle cx="104" cy="86"  r="14" fill="#F29BCB"/>
+  <circle cx="104" cy="70"  r="8"  fill="#EDE9FF"/>
+</svg>
