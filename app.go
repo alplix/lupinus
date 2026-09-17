@@ -171,6 +171,27 @@ func (a *App) SetTheme(theme string) error {
 	return a.store.SetTheme(theme)
 }
 
+// ListTrustedCertificates returns every "host:port" address with an RDP
+// TLS certificate pinned via trust-on-first-use.
+func (a *App) ListTrustedCertificates() []string {
+	if a.store == nil {
+		return nil
+	}
+	return a.store.TrustedCertificates()
+}
+
+// ForgetCertificate un-pins a trusted RDP certificate — the next
+// connection to addr pins whatever certificate it presents instead of
+// being rejected for not matching the old one. Use after a legitimate
+// server change (reinstall, renewed cert); for anything else, a mismatch
+// is more likely a real problem than something to dismiss.
+func (a *App) ForgetCertificate(addr string) error {
+	if a.store == nil {
+		return fmt.Errorf("config store unavailable")
+	}
+	return a.store.ForgetCertificate(addr)
+}
+
 // --- Connections ---
 
 func (a *App) ListConnections() []store.Connection {
@@ -331,13 +352,19 @@ type sessionConn struct {
 	runFn   func(sess *wsbridge.Session) error
 }
 
-func dialSession(ctx context.Context, protocol, addr, username, password string) (sessionConn, error) {
+func (a *App) dialSession(ctx context.Context, protocol, addr, username, password string) (sessionConn, error) {
 	switch protocol {
 	case "rdp":
 		client, err := rdp.Dial(ctx, addr, rdp.DialOptions{
 			Username:      username,
 			Password:      password,
 			DialTimeoutMS: 10000,
+			VerifyCertificate: func(fingerprintHex string) error {
+				if a.store == nil {
+					return nil
+				}
+				return a.store.VerifyOrTrustCertificate(addr, fingerprintHex)
+			},
 		})
 		if err != nil {
 			return sessionConn{}, err
@@ -378,7 +405,7 @@ func (a *App) startSession(protocol, addr, username, password string) (ConnectRe
 
 	ctx, cancel := context.WithCancel(a.ctx)
 
-	conn, err := dialSession(ctx, protocol, addr, username, password)
+	conn, err := a.dialSession(ctx, protocol, addr, username, password)
 	if err != nil {
 		cancel()
 		a.emitStatus(sessionID, "error", err.Error())
@@ -430,7 +457,7 @@ func (a *App) startSession(protocol, addr, username, password string) (ConnectRe
 				}
 			}
 
-			newConn, err := dialSession(ctx, protocol, addr, username, password)
+			newConn, err := a.dialSession(ctx, protocol, addr, username, password)
 			if err != nil {
 				if ctx.Err() != nil {
 					a.emitStatus(sessionID, "disconnected", "")

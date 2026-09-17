@@ -14,6 +14,8 @@ import {
   OpenGitHub,
   ExportConnections,
   ImportConnections,
+  ListTrustedCertificates,
+  ForgetCertificate,
 } from '../wailsjs/go/main/App'
 import { EventsOn } from '../wailsjs/runtime/runtime'
 
@@ -93,6 +95,7 @@ const state = {
   // QuickConnect() resolves.
   viewers: [],
   activeViewerId: null, // localId of the viewer tab currently shown
+  trustedCerts: [], // "host:port" addresses with a pinned RDP TLS certificate
 }
 
 // Per-session canvas/WebSocket handles, keyed by localId — deliberately
@@ -331,6 +334,7 @@ function renderSettingsPage() {
         <button class="btn sm ghost" onclick="window._importConnections()">Import…</button>
       </div>
     </div>
+    ${renderTrustedCertsCard()}
     <div class="settings-card">
       <h2>About</h2>
       <p class="soft" style="margin:0;font-size:13px;">Lupinus — Native VNC Client</p>
@@ -344,6 +348,34 @@ function renderSettingsPage() {
       <div class="support-credit">Coded by Alperen Yavuz</div>
       <div class="support-prompt">Enjoying Lupinus?<br>Support the project</div>
       <button class="btn primary sm" onclick="window._openSupport()">Support Lupinus</button>
+    </div>
+  `
+}
+
+// RDP's TLS layer is trust-on-first-use (see internal/store's doc
+// comment) — the first certificate seen for a server is pinned, and a
+// later mismatch is treated as a hard error rather than silently
+// re-trusting it. This card is only shown once at least one server has
+// been pinned, and lets the user clear a stale pin (e.g. after a
+// legitimate server reinstall) without editing the config file by hand.
+function renderTrustedCertsCard() {
+  if (state.trustedCerts.length === 0) return ''
+  return `
+    <div class="settings-card">
+      <h2>Trusted RDP Certificates</h2>
+      <p class="soft" style="margin:0;font-size:13px;">Pinned on first connect. If a server's certificate changes unexpectedly, Lupinus refuses to connect rather than trusting it silently — forget it here only if you're sure the change is legitimate.</p>
+      <div class="trusted-cert-list">
+        ${state.trustedCerts
+          .map(
+            (addr) => `
+          <div class="trusted-cert-row">
+            <span class="num trunc">${esc(addr)}</span>
+            <button class="btn sm ghost danger" onclick="window._forgetCertificate('${attr(addr)}')">Forget</button>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
     </div>
   `
 }
@@ -1031,6 +1063,18 @@ window._importConnections = async () => {
   }
 }
 
+window._forgetCertificate = async (addr) => {
+  if (!confirm(`Forget the trusted certificate for ${addr}? The next connection will pin whatever certificate the server presents.`)) return
+  try {
+    await ForgetCertificate(addr)
+    state.trustedCerts = (await ListTrustedCertificates()) || []
+    render()
+    toast('Certificate forgotten', 'ok')
+  } catch (e) {
+    toast((e && (e.message || e.toString())) || 'Could not forget certificate', 'err')
+  }
+}
+
 window._openAbout = () => {
   state.modal = { type: 'about' }
   renderModal()
@@ -1108,6 +1152,11 @@ async function init() {
     state.connections = (await ListConnections()) || []
   } catch {
     toast('Could not load saved connections', 'err')
+  }
+  try {
+    state.trustedCerts = (await ListTrustedCertificates()) || []
+  } catch {
+    /* non-fatal: the card just stays hidden */
   }
   if (state.page !== 'viewer') render()
 

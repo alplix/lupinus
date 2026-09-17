@@ -97,4 +97,12 @@ type DialOptions struct {
 	Domain   string // optional
 	// DialTimeout bounds the initial TCP connect. Zero means no timeout.
 	DialTimeoutMS int
+	// VerifyCertificate, if set, is called once the TLS handshake
+	// completes with the hex-encoded SHA-256 fingerprint of the server's
+	// leaf certificate. Returning an error aborts Dial before any
+	// RDP-level data is sent. Left nil, the certificate is accepted
+	// unconditionally (equivalent to v0.2.0's behavior) — callers should
+	// always set this in production; it's optional here only so tests
+	// and other callers that don't have a trust store handy still work.
+	VerifyCertificate func(fingerprintHex string) error
 }

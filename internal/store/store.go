@@ -7,6 +7,7 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -34,6 +35,14 @@ type Connection struct {
 type fileData struct {
 	Connections []Connection `json:"connections"`
 	Theme       string       `json:"theme"` // "light" | "dark" | "system"
+
+	// TrustedCerts implements trust-on-first-use for RDP's TLS layer,
+	// which almost always presents a self-signed certificate — there's no
+	// CA chain to verify against, so instead the first certificate seen
+	// for a given "host:port" is pinned, and every later connection must
+	// match it exactly (same idea as SSH's known_hosts). Keyed by address,
+	// value is the SHA-256 fingerprint of the leaf certificate, hex-encoded.
+	TrustedCerts map[string]string `json:"trustedCerts,omitempty"`
 }
 
 // Store is safe for concurrent use.
@@ -183,4 +192,53 @@ func (s *Store) SetTheme(theme string) error {
 	err := s.persistLocked()
 	s.mu.Unlock()
 	return err
+}
+
+// VerifyOrTrustCertificate implements trust-on-first-use: the first
+// fingerprint seen for addr is pinned and persisted; every later call for
+// the same addr must match it exactly, or this returns an error explaining
+// the mismatch (the server's certificate changed — could be a reinstall,
+// could be a man-in-the-middle attack) rather than silently accepting it.
+func (s *Store) VerifyOrTrustCertificate(addr, fingerprint string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.TrustedCerts == nil {
+		s.data.TrustedCerts = map[string]string{}
+	}
+	existing, known := s.data.TrustedCerts[addr]
+	if !known {
+		s.data.TrustedCerts[addr] = fingerprint
+		return s.persistLocked()
+	}
+	if existing != fingerprint {
+		return fmt.Errorf(
+			"the TLS certificate for %s does not match the one trusted on first connect (expected %s…, got %s…) — "+
+				"this happens if the server was reinstalled, but can also mean a man-in-the-middle attack. "+
+				"If you're certain the change is expected, forget the old certificate in Settings and reconnect",
+			addr, existing[:16], fingerprint[:16],
+		)
+	}
+	return nil
+}
+
+// TrustedCertificates lists every "host:port" address with a pinned
+// certificate, for display/management in Settings.
+func (s *Store) TrustedCertificates() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, 0, len(s.data.TrustedCerts))
+	for addr := range s.data.TrustedCerts {
+		out = append(out, addr)
+	}
+	return out
+}
+
+// ForgetCertificate removes a pinned certificate, so the next connection
+// to addr re-pins whatever certificate it presents (trust-on-first-use
+// again) instead of being rejected as a mismatch.
+func (s *Store) ForgetCertificate(addr string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.data.TrustedCerts, addr)
+	return s.persistLocked()
 }

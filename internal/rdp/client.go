@@ -2,7 +2,9 @@ package rdp
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"sync"
@@ -29,6 +31,7 @@ type Client struct {
 	tc   net.Conn // active conn: tc == conn until TLS upgrade, then the *tls.Conn
 
 	username, password, domain string
+	verifyCertificate          func(fingerprintHex string) error
 
 	// Negotiated during MCS/GCC setup (gcc.go/mcs.go).
 	serverWidth, serverHeight int
@@ -64,11 +67,12 @@ func Dial(ctx context.Context, addr string, opts DialOptions) (*Client, error) {
 	}
 
 	c := &Client{
-		conn:     conn,
-		tc:       conn,
-		username: opts.Username,
-		password: opts.Password,
-		domain:   opts.Domain,
+		conn:              conn,
+		tc:                conn,
+		username:          opts.Username,
+		password:          opts.Password,
+		domain:            opts.Domain,
+		verifyCertificate: opts.VerifyCertificate,
 	}
 
 	// Bound the whole handshake (not just the initial TCP connect) so a
@@ -154,13 +158,29 @@ func (c *Client) negotiateSecurity() error {
 		return err
 	}
 
-	// RDP servers use self-signed certificates by default; there's no
-	// cert pinning/TOFU yet (documented roadmap gap, same honesty as the
-	// VNC client's "no TLS in v0.1.0" note, inverted here).
+	// RDP servers overwhelmingly use self-signed certificates, so there's
+	// no CA chain to verify against — InsecureSkipVerify disables Go's
+	// chain check, and verifyCertificate (trust-on-first-use, see
+	// internal/store.VerifyOrTrustCertificate) takes over authenticating
+	// the server instead, the same model SSH's known_hosts uses.
 	tlsConn := tls.Client(c.conn, &tls.Config{InsecureSkipVerify: true}) //nolint:gosec
 	if err := tlsConn.HandshakeContext(context.Background()); err != nil {
 		return fmt.Errorf("rdp: TLS handshake: %w", err)
 	}
+
+	if c.verifyCertificate != nil {
+		peers := tlsConn.ConnectionState().PeerCertificates
+		if len(peers) == 0 {
+			tlsConn.Close()
+			return protoErrf("rdp: server presented no TLS certificate")
+		}
+		sum := sha256.Sum256(peers[0].Raw)
+		if err := c.verifyCertificate(hex.EncodeToString(sum[:])); err != nil {
+			tlsConn.Close()
+			return err
+		}
+	}
+
 	c.tc = tlsConn
 	return nil
 }
