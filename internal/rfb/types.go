@@ -83,10 +83,9 @@ func qualityPresetLevels(preset string) (compressLevel, qualityLevel int) {
 	}
 }
 
-// PixelFormat mirrors the 16-byte PIXEL_FORMAT structure. Lupinus always
-// requests the same fixed format from the server (see requestedPixelFormat
-// in handshake.go) so the decoder never has to deal with arbitrary
-// server-native depths/shifts.
+// PixelFormat mirrors the 16-byte PIXEL_FORMAT structure. Lupinus only ever
+// asks the server for one of the fixed formats in pixelLevels (pixfmt.go), so
+// the decoders never have to deal with arbitrary server-native depths/shifts.
 type PixelFormat struct {
 	BitsPerPixel uint8
 	Depth        uint8
@@ -98,25 +97,6 @@ type PixelFormat struct {
 	RedShift     uint8
 	GreenShift   uint8
 	BlueShift    uint8
-}
-
-// requestedPixelFormat is the format Lupinus always asks the server to use:
-// 32 bits per pixel, 24-bit colour, little-endian, true-colour, with R at
-// byte 0 / G at byte 1 / B at byte 2 on the wire. That byte order is exactly
-// RGB (plus an unused 4th byte we overwrite with alpha=255), so decoded Raw
-// and ZRLE pixel data can be handed to an HTML canvas ImageData buffer with
-// no channel shuffling.
-var requestedPixelFormat = PixelFormat{
-	BitsPerPixel: 32,
-	Depth:        24,
-	BigEndian:    0,
-	TrueColor:    1,
-	RedMax:       255,
-	GreenMax:     255,
-	BlueMax:      255,
-	RedShift:     0,
-	GreenShift:   8,
-	BlueShift:    16,
 }
 
 // ProtocolError wraps a violation of the RFB protocol (as opposed to a plain

@@ -232,27 +232,17 @@ func (c *Client) readServerInit() error {
 }
 
 func (c *Client) sendSetPixelFormat() error {
-	buf := make([]byte, 20)
-	buf[0] = msgSetPixelFormat
-	pf := requestedPixelFormat
-	buf[4] = pf.BitsPerPixel
-	buf[5] = pf.Depth
-	buf[6] = pf.BigEndian
-	buf[7] = pf.TrueColor
-	buf[8] = byte(pf.RedMax >> 8)
-	buf[9] = byte(pf.RedMax)
-	buf[10] = byte(pf.GreenMax >> 8)
-	buf[11] = byte(pf.GreenMax)
-	buf[12] = byte(pf.BlueMax >> 8)
-	buf[13] = byte(pf.BlueMax)
-	buf[14] = pf.RedShift
-	buf[15] = pf.GreenShift
-	buf[16] = pf.BlueShift
-	_, err := c.w.Write(buf)
+	_, err := c.w.Write(pixelMessage(&pixelLevels[c.level]))
 	return err
 }
 
 func (c *Client) sendSetEncodings() error {
+	_, err := c.w.Write(c.encodingsMessage(c.level))
+	return err
+}
+
+// encodingsMessage builds the SetEncodings message for pixel level `level`.
+func (c *Client) encodingsMessage(level int) []byte {
 	// Deliberately not advertising EncodingExtendedDesktopSize here: tested
 	// live against a real TigerVNC/Xvnc server, advertising it made that
 	// server only ever send the ExtendedDesktopSize + Cursor capability
@@ -264,16 +254,20 @@ func (c *Client) sendSetEncodings() error {
 	// in place and correct, it's just not negotiated. Multi-monitor/
 	// layout-aware resize is already a roadmap item, not v0.1.0 scope.
 	compressLevel, qualityLevel := qualityPresetLevels(c.quality)
-	encodings := []int32{
-		EncodingTight,
+	encodings := make([]int32, 0, 8)
+	// Tight only decodes at the full-fidelity pixel level (see tight.go).
+	if level == 0 && !debugForceZRLE {
+		encodings = append(encodings, EncodingTight)
+	}
+	encodings = append(encodings,
 		EncodingZRLE,
 		EncodingCopyRect,
 		EncodingRaw,
 		EncodingCursor,
 		EncodingDesktopSize,
-		encodingCompressLevel0 + int32(compressLevel),
-		encodingQualityLevel0 + int32(qualityLevel),
-	}
+		encodingCompressLevel0+int32(compressLevel),
+		encodingQualityLevel0+int32(qualityLevel),
+	)
 
 	buf := make([]byte, 4+4*len(encodings))
 	buf[0] = msgSetEncodings
@@ -286,6 +280,5 @@ func (c *Client) sendSetEncodings() error {
 		buf[off+2] = byte(uint32(enc) >> 8)
 		buf[off+3] = byte(uint32(enc))
 	}
-	_, err := c.w.Write(buf)
-	return err
+	return buf
 }

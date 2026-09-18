@@ -34,6 +34,9 @@ func (c *Client) requestUpdate(incremental bool, x, y, w, h int) error {
 // SendPointerEvent reports the current pointer position and button mask
 // (bit 0 = left, bit 1 = middle, bit 2 = right, bits 3/4 = wheel up/down).
 func (c *Client) SendPointerEvent(x, y int, buttonMask uint8) error {
+	if debugFBWire {
+		c.nPointer.Add(1)
+	}
 	buf := make([]byte, 6)
 	buf[0] = msgPointerEvent
 	buf[1] = buttonMask

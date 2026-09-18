@@ -240,24 +240,52 @@ export function openViewer({ container, bridgeUrl, protocol = 'vnc', onSocketSta
 	let buttonMask = 0;
 	const BUTTON_BITS = { 0: 1, 1: 2, 2: 4 };
 
+	// A mouse (or a high-polling-rate one) fires mousemove far faster than a
+	// remote screen can use it — measured well over 200/s — and every event
+	// is a wire message the server has to read and act on. Coalesce moves to
+	// at most one per animation frame, always carrying the newest position;
+	// anything with a button change flushes immediately so clicks never land
+	// at a stale position or get reordered against a queued move.
+	let pendingMove = null;
+	let moveFrame = 0;
+
+	function flushMove() {
+		moveFrame = 0;
+		if (pendingMove) {
+			const [x, y] = pendingMove;
+			pendingMove = null;
+			sendPointer(x, y, buttonMask);
+		}
+	}
+	function dropPendingMove() {
+		pendingMove = null;
+		if (moveFrame) {
+			cancelAnimationFrame(moveFrame);
+			moveFrame = 0;
+		}
+	}
+
 	function onPointerMove(ev) {
-		const [x, y] = toFramebufferCoords(ev.clientX, ev.clientY);
-		sendPointer(x, y, buttonMask);
+		pendingMove = toFramebufferCoords(ev.clientX, ev.clientY);
+		if (!moveFrame) moveFrame = requestAnimationFrame(flushMove);
 	}
 	function onPointerDown(ev) {
 		canvas.focus();
+		dropPendingMove();
 		buttonMask |= BUTTON_BITS[ev.button] ?? 0;
 		const [x, y] = toFramebufferCoords(ev.clientX, ev.clientY);
 		sendPointer(x, y, buttonMask);
 		ev.preventDefault();
 	}
 	function onPointerUp(ev) {
+		dropPendingMove();
 		buttonMask &= ~(BUTTON_BITS[ev.button] ?? 0);
 		const [x, y] = toFramebufferCoords(ev.clientX, ev.clientY);
 		sendPointer(x, y, buttonMask);
 		ev.preventDefault();
 	}
 	function onWheel(ev) {
+		dropPendingMove();
 		const [x, y] = toFramebufferCoords(ev.clientX, ev.clientY);
 		const bit = ev.deltaY < 0 ? 8 : 16; // wheel up / wheel down
 		sendPointer(x, y, buttonMask | bit);
@@ -297,6 +325,7 @@ export function openViewer({ container, bridgeUrl, protocol = 'vnc', onSocketSta
 	function close() {
 		if (closed) return;
 		closed = true;
+		dropPendingMove();
 		resizeObserver.disconnect();
 		canvas.removeEventListener('mousemove', onPointerMove);
 		canvas.removeEventListener('mousedown', onPointerDown);

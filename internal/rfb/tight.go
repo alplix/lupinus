@@ -20,11 +20,13 @@ var debugTightWire = os.Getenv("RFB_DEBUG_TIGHT") != ""
 // written down anywhere more official than "what the reference
 // implementations do".
 //
-// This client's fixed requestedPixelFormat (32bpp/24-depth/true-colour,
-// byte-aligned RGB — see types.go) is exactly Tight's "is888" fast path,
-// so unlike TigerVNC's decoder this implementation doesn't need the
-// generic 8/16bpp branches: truecolor pixel and palette entries alike are
-// always the 3-byte TPIXEL form.
+// This client's full-fidelity pixel format (pixelLevels[0]: 32bpp/24-depth/
+// true-colour, byte-aligned RGB — see pixfmt.go) is exactly Tight's "is888"
+// fast path, so unlike TigerVNC's decoder this implementation doesn't need
+// the generic 8/16bpp branches: truecolor pixel and palette entries alike
+// are always the 3-byte TPIXEL form. That's why Tight is only advertised —
+// and only ever decoded — at pixel level 0; the reduced-depth levels drop it
+// from SetEncodings (see Client.encodingsMessage).
 const (
 	tightExplicitFilter = 0x04
 	tightFill           = 0x08

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -27,7 +28,11 @@ func TestManualTightAgainstTigerVNC(t *testing.T) {
 	t.Logf("dial succeeded: %dx%d %q", c.width, c.height, c.name)
 
 	sink := &tightLogSink{t: t}
-	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	secs := 6
+	if v, err := strconv.Atoi(os.Getenv("RFB_MANUAL_TEST_SECONDS")); err == nil && v > 0 {
+		secs = v
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(secs)*time.Second)
 	defer cancel()
 	err = c.Run(ctx, sink)
 	t.Logf("Run returned: %v (updates=%d totalBytes=%d)", err, sink.updates, sink.totalBytes)

@@ -16,7 +16,7 @@ func TestReadRLELength(t *testing.T) {
 		{[]byte{255, 255, 0}, 511},
 	}
 	for _, c := range cases {
-		got, err := readRLELength(bytes.NewReader(c.in))
+		got, err := readRLELength(bytes.NewReader(c.in), make([]byte, 1))
 		if err != nil {
 			t.Fatalf("readRLELength(%v): %v", c.in, err)
 		}
@@ -54,7 +54,7 @@ func TestDecodeZRLETileRaw(t *testing.T) {
 	// subencoding 0 (Raw), 2x1 tile, CPIXELs (R,G,B) for each pixel.
 	in := []byte{0, 10, 20, 30, 40, 50, 60}
 	out := make([]byte, 2*1*4)
-	if err := decodeZRLETile(bytes.NewReader(in), out, 2, 1); err != nil {
+	if err := decodeZRLETile(bytes.NewReader(in), &pixelLevels[0], make([]byte, zrleScratchSize), out, 2, 1); err != nil {
 		t.Fatalf("decodeZRLETile: %v", err)
 	}
 	if r, g, b, a := rgbaAt(out, 0); r != 10 || g != 20 || b != 30 || a != 0xFF {
@@ -69,7 +69,7 @@ func TestDecodeZRLETileSolid(t *testing.T) {
 	// subencoding 1 (Solid), 2x2 tile, single CPIXEL.
 	in := []byte{1, 7, 8, 9}
 	out := make([]byte, 2*2*4)
-	if err := decodeZRLETile(bytes.NewReader(in), out, 2, 2); err != nil {
+	if err := decodeZRLETile(bytes.NewReader(in), &pixelLevels[0], make([]byte, zrleScratchSize), out, 2, 2); err != nil {
 		t.Fatalf("decodeZRLETile: %v", err)
 	}
 	for i := 0; i < 4; i++ {
@@ -84,7 +84,7 @@ func TestDecodeZRLETilePackedPalette(t *testing.T) {
 	// palette[0]=(1,1,1), palette[1]=(2,2,2); indices 1,0,1,0 packed MSB-first -> 0b1010_0000 = 0xA0.
 	in := []byte{2, 1, 1, 1, 2, 2, 2, 0xA0}
 	out := make([]byte, 4*1*4)
-	if err := decodeZRLETile(bytes.NewReader(in), out, 4, 1); err != nil {
+	if err := decodeZRLETile(bytes.NewReader(in), &pixelLevels[0], make([]byte, zrleScratchSize), out, 4, 1); err != nil {
 		t.Fatalf("decodeZRLETile: %v", err)
 	}
 	want := [][3]byte{{2, 2, 2}, {1, 1, 1}, {2, 2, 2}, {1, 1, 1}}
@@ -100,7 +100,7 @@ func TestDecodeZRLETilePlainRLE(t *testing.T) {
 	// (encoded as 1 + runlength-byte(2)).
 	in := []byte{128, 5, 6, 7, 2}
 	out := make([]byte, 3*4)
-	if err := decodeZRLETile(bytes.NewReader(in), out, 3, 1); err != nil {
+	if err := decodeZRLETile(bytes.NewReader(in), &pixelLevels[0], make([]byte, zrleScratchSize), out, 3, 1); err != nil {
 		t.Fatalf("decodeZRLETile: %v", err)
 	}
 	for i := 0; i < 3; i++ {
@@ -115,12 +115,43 @@ func TestDecodeZRLETilePaletteRLE(t *testing.T) {
 	// entry (top bit set -> index 0) with run length 3.
 	in := []byte{130, 1, 1, 1, 2, 2, 2, 0x80, 2}
 	out := make([]byte, 3*4)
-	if err := decodeZRLETile(bytes.NewReader(in), out, 3, 1); err != nil {
+	if err := decodeZRLETile(bytes.NewReader(in), &pixelLevels[0], make([]byte, zrleScratchSize), out, 3, 1); err != nil {
 		t.Fatalf("decodeZRLETile: %v", err)
 	}
 	for i := 0; i < 3; i++ {
 		if r, g, b, a := rgbaAt(out, i); r != 1 || g != 1 || b != 1 || a != 0xFF {
 			t.Errorf("pixel%d = %d,%d,%d,%d", i, r, g, b, a)
 		}
+	}
+}
+
+// The reduced pixel levels must decode a ZRLE tile to the right RGBA:
+// expected values come from expanding each channel to 8 bits by hand.
+func TestDecodeZRLETileReducedLevels(t *testing.T) {
+	scratch := make([]byte, zrleScratchSize)
+
+	// Level 1 (RGB565, little-endian CPIXEL): solid tile of 0xF800 = pure red.
+	out := make([]byte, 2*1*4)
+	if err := decodeZRLETile(bytes.NewReader([]byte{1, 0x00, 0xF8}), &pixelLevels[1], scratch, out, 2, 1); err != nil {
+		t.Fatalf("level 1 solid: %v", err)
+	}
+	if want := []byte{255, 0, 0, 255, 255, 0, 0, 255}; !bytes.Equal(out, want) {
+		t.Errorf("level 1 solid = %v, want %v", out, want)
+	}
+
+	// Level 1 raw: 0x07E0 = pure green, 0x001F = pure blue.
+	if err := decodeZRLETile(bytes.NewReader([]byte{0, 0xE0, 0x07, 0x1F, 0x00}), &pixelLevels[1], scratch, out, 2, 1); err != nil {
+		t.Fatalf("level 1 raw: %v", err)
+	}
+	if want := []byte{0, 255, 0, 255, 0, 0, 255, 255}; !bytes.Equal(out, want) {
+		t.Errorf("level 1 raw = %v, want %v", out, want)
+	}
+
+	// Level 2 (RGB332, 1-byte CPIXEL) palette of {0xE0 red, 0x03 blue}, indices 0,1.
+	if err := decodeZRLETile(bytes.NewReader([]byte{2, 0xE0, 0x03, 0b01000000}), &pixelLevels[2], scratch, out, 2, 1); err != nil {
+		t.Fatalf("level 2 palette: %v", err)
+	}
+	if want := []byte{255, 0, 0, 255, 0, 0, 255, 255}; !bytes.Equal(out, want) {
+		t.Errorf("level 2 palette = %v, want %v", out, want)
 	}
 }
