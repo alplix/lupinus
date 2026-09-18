@@ -5,7 +5,7 @@
 package version
 
 const (
-	Version = "0.3.0"
+	Version = "0.3.1"
 	Name    = "Lupinus"
 	Author  = "Alperen Yavuz"
 	Repo    = "https://github.com/alplix/lupinus"
