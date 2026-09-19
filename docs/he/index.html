@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lupinus — לקוח שולחן עבודה מרוחק מקורי ל-VNC ול-RDP</title>
+  <meta name="description" content="התחברו לכל מחשב VNC או RDP — כולל שיתוף המסך המובנה של Mac — מאפליקציה מקורית אחת, קטנה ומהירה. בלי לשונית דפדפן ובלי Electron.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#090711">
+  <link rel="icon" type="image/svg+xml" href="../logo.svg">
+  <link rel="canonical" href="https://alplix.github.io/lupinus/he/">
+  <link rel="alternate" hreflang="en" href="https://alplix.github.io/lupinus/">
+  <link rel="alternate" hreflang="tr" href="https://alplix.github.io/lupinus/tr/">
+  <link rel="alternate" hreflang="es" href="https://alplix.github.io/lupinus/es/">
+  <link rel="alternate" hreflang="fr" href="https://alplix.github.io/lupinus/fr/">
+  <link rel="alternate" hreflang="de" href="https://alplix.github.io/lupinus/de/">
+  <link rel="alternate" hreflang="it" href="https://alplix.github.io/lupinus/it/">
+  <link rel="alternate" hreflang="pt" href="https://alplix.github.io/lupinus/pt/">
+  <link rel="alternate" hreflang="ru" href="https://alplix.github.io/lupinus/ru/">
+  <link rel="alternate" hreflang="ar" href="https://alplix.github.io/lupinus/ar/">
+  <link rel="alternate" hreflang="zh" href="https://alplix.github.io/lupinus/zh/">
+  <link rel="alternate" hreflang="ja" href="https://alplix.github.io/lupinus/ja/">
+  <link rel="alternate" hreflang="ko" href="https://alplix.github.io/lupinus/ko/">
+  <link rel="alternate" hreflang="hi" href="https://alplix.github.io/lupinus/hi/">
+  <link rel="alternate" hreflang="nl" href="https://alplix.github.io/lupinus/nl/">
+  <link rel="alternate" hreflang="pl" href="https://alplix.github.io/lupinus/pl/">
+  <link rel="alternate" hreflang="uk" href="https://alplix.github.io/lupinus/uk/">
+  <link rel="alternate" hreflang="el" href="https://alplix.github.io/lupinus/el/">
+  <link rel="alternate" hreflang="sv" href="https://alplix.github.io/lupinus/sv/">
+  <link rel="alternate" hreflang="no" href="https://alplix.github.io/lupinus/no/">
+  <link rel="alternate" hreflang="da" href="https://alplix.github.io/lupinus/da/">
+  <link rel="alternate" hreflang="fi" href="https://alplix.github.io/lupinus/fi/">
+  <link rel="alternate" hreflang="cs" href="https://alplix.github.io/lupinus/cs/">
+  <link rel="alternate" hreflang="ro" href="https://alplix.github.io/lupinus/ro/">
+  <link rel="alternate" hreflang="hu" href="https://alplix.github.io/lupinus/hu/">
+  <link rel="alternate" hreflang="bg" href="https://alplix.github.io/lupinus/bg/">
+  <link rel="alternate" hreflang="hr" href="https://alplix.github.io/lupinus/hr/">
+  <link rel="alternate" hreflang="sr" href="https://alplix.github.io/lupinus/sr/">
+  <link rel="alternate" hreflang="sk" href="https://alplix.github.io/lupinus/sk/">
+  <link rel="alternate" hreflang="sl" href="https://alplix.github.io/lupinus/sl/">
+  <link rel="alternate" hreflang="he" href="https://alplix.github.io/lupinus/he/">
+  <link rel="alternate" hreflang="fa" href="https://alplix.github.io/lupinus/fa/">
+  <link rel="alternate" hreflang="vi" href="https://alplix.github.io/lupinus/vi/">
+  <link rel="alternate" hreflang="th" href="https://alplix.github.io/lupinus/th/">
+  <link rel="alternate" hreflang="id" href="https://alplix.github.io/lupinus/id/">
+  <link rel="alternate" hreflang="ms" href="https://alplix.github.io/lupinus/ms/">
+  <link rel="alternate" hreflang="sw" href="https://alplix.github.io/lupinus/sw/">
+  <link rel="alternate" hreflang="ur" href="https://alplix.github.io/lupinus/ur/">
+  <link rel="alternate" hreflang="bn" href="https://alplix.github.io/lupinus/bn/">
+  <link rel="alternate" hreflang="x-default" href="https://alplix.github.io/lupinus/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Lupinus">
+  <meta property="og:locale" content="he_IL">
+  <meta property="og:title" content="Lupinus — לקוח שולחן עבודה מרוחק מקורי ל-VNC ול-RDP">
+  <meta property="og:description" content="התחברו לכל מחשב VNC או RDP — כולל שיתוף המסך המובנה של Mac — מאפליקציה מקורית אחת, קטנה ומהירה. בלי לשונית דפדפן ובלי Electron.">
+  <meta property="og:url" content="https://alplix.github.io/lupinus/he/">
+  <meta property="og:image" content="https://alplix.github.io/lupinus/screenshots/live-session.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="800">
+  <meta property="og:image:alt" content="הפעלת שולחן עבודה מרוחק חיה ב-Lupinus">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Lupinus — לקוח שולחן עבודה מרוחק מקורי ל-VNC ול-RDP">
+  <meta name="twitter:description" content="התחברו לכל מחשב VNC או RDP — כולל שיתוף המסך המובנה של Mac — מאפליקציה מקורית אחת, קטנה ומהירה. בלי לשונית דפדפן ובלי Electron.">
+  <meta name="twitter:image" content="https://alplix.github.io/lupinus/screenshots/live-session.png">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Lupinus","alternateName":"Lupinus לקוח שולחן עבודה מרוחק מקורי ל-VNC ול-RDP","description":"התחברו לכל מחשב VNC או RDP — כולל שיתוף המסך המובנה של Mac — מאפליקציה מקורית אחת, קטנה ומהירה. בלי לשונית דפדפן ובלי Electron.","url":"https://alplix.github.io/lupinus/he/","inLanguage":"he","applicationCategory":"NetworkingApplication","applicationSubCategory":"Remote desktop client (VNC, RDP)","operatingSystem":"Windows, macOS, Linux","downloadUrl":"https://github.com/alplix/lupinus/releases/latest","installUrl":"https://github.com/alplix/lupinus/releases/latest","screenshot":"https://alplix.github.io/lupinus/screenshots/live-session.png","image":"https://alplix.github.io/lupinus/screenshots/live-session.png","license":"https://opensource.org/licenses/MIT","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Alperen Yavuz","url":"https://github.com/alplix"},"sameAs":["https://github.com/alplix/lupinus"]}</script>
+  <script>
+    /* Send a first-time visitor whose browser language has a translation to it.
+       Only from the English root, never when a language was chosen explicitly
+       (saved), and never for crawlers, which don't send a non-English language. */
+    (function () {
+      if (document.documentElement.lang !== 'en') return;
+      var L = {"tr":"../tr/","es":"../es/","fr":"../fr/","de":"../de/","it":"../it/","pt":"../pt/","ru":"../ru/","ar":"../ar/","zh":"../zh/","ja":"../ja/","ko":"../ko/","hi":"../hi/","nl":"../nl/","pl":"../pl/","uk":"../uk/","el":"../el/","sv":"../sv/","no":"../no/","da":"../da/","fi":"../fi/","cs":"../cs/","ro":"../ro/","hu":"../hu/","bg":"../bg/","hr":"../hr/","sr":"../sr/","sk":"../sk/","sl":"../sl/","he":"../he/","fa":"../fa/","vi":"../vi/","th":"../th/","id":"../id/","ms":"../ms/","sw":"../sw/","ur":"../ur/","bn":"../bn/"};
+      try {
+        var saved = localStorage.getItem('lupinus-lang');
+        if (saved) { if (saved !== 'en' && L[saved]) location.replace(L[saved] + location.hash); return; }
+      } catch (e) {}
+      var prefs = navigator.languages || [navigator.language || 'en'];
+      for (var i = 0; i < prefs.length; i++) {
+        var c = String(prefs[i]).toLowerCase().split('-')[0];
+        if (c === 'nb' || c === 'nn') c = 'no';
+        if (c === 'en') return;
+        if (L[c]) { location.replace(L[c] + location.hash); return; }
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a class="skip" href="#main">דלג לתוכן</a>
+
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="Lupinus">
+      <img src="../logo.svg" alt="" width="32" height="32">
+      <span>Lupinus</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="https://github.com/alplix/lupinus" rel="noopener">GitHub</a>
+    </nav>
+    <label class="lang">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
+      <span class="sr">שפה</span>
+      <select id="lang" aria-label="שפה">
+        <option value="../" data-code="en">English</option>
+        <option value="../tr/" data-code="tr">Türkçe</option>
+        <option value="../es/" data-code="es">Español</option>
+        <option value="../fr/" data-code="fr">Français</option>
+        <option value="../de/" data-code="de">Deutsch</option>
+        <option value="../it/" data-code="it">Italiano</option>
+        <option value="../pt/" data-code="pt">Português</option>
+        <option value="../ru/" data-code="ru">Русский</option>
+        <option value="../ar/" data-code="ar">العربية</option>
+        <option value="../zh/" data-code="zh">中文</option>
+        <option value="../ja/" data-code="ja">日本語</option>
+        <option value="../ko/" data-code="ko">한국어</option>
+        <option value="../hi/" data-code="hi">हिन्दी</option>
+        <option value="../nl/" data-code="nl">Nederlands</option>
+        <option value="../pl/" data-code="pl">Polski</option>
+        <option value="../uk/" data-code="uk">Українська</option>
+        <option value="../el/" data-code="el">Ελληνικά</option>
+        <option value="../sv/" data-code="sv">Svenska</option>
+        <option value="../no/" data-code="no">Norsk</option>
+        <option value="../da/" data-code="da">Dansk</option>
+        <option value="../fi/" data-code="fi">Suomi</option>
+        <option value="../cs/" data-code="cs">Čeština</option>
+        <option value="../ro/" data-code="ro">Română</option>
+        <option value="../hu/" data-code="hu">Magyar</option>
+        <option value="../bg/" data-code="bg">Български</option>
+        <option value="../hr/" data-code="hr">Hrvatski</option>
+        <option value="../sr/" data-code="sr">Српски</option>
+        <option value="../sk/" data-code="sk">Slovenčina</option>
+        <option value="../sl/" data-code="sl">Slovenščina</option>
+        <option value="../he/" data-code="he" selected>עברית</option>
+        <option value="../fa/" data-code="fa">فارسی</option>
+        <option value="../vi/" data-code="vi">Tiếng Việt</option>
+        <option value="../th/" data-code="th">ไทย</option>
+        <option value="../id/" data-code="id">Bahasa Indonesia</option>
+        <option value="../ms/" data-code="ms">Bahasa Melayu</option>
+        <option value="../sw/" data-code="sw">Kiswahili</option>
+        <option value="../ur/" data-code="ur">اردو</option>
+        <option value="../bn/" data-code="bn">বাংলা</option>
+      </select>
+    </label>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="dot"></span><span id="latest" data-tpl="הגרסה האחרונה: {v}" hidden></span></p>
+        <h1>לקוח שולחן עבודה מרוחק מקורי ל-VNC ול-RDP</h1>
+        <p class="lead">התחברו לכל מחשב VNC או RDP — כולל שיתוף המסך המובנה של Mac — מאפליקציה מקורית אחת, קטנה ומהירה. בלי לשונית דפדפן ובלי Electron.</p>
+        <div class="cta">
+          <a class="btn primary" id="cta" href="#download" data-tpl-os="הורדה עבור {os}"><span id="cta-text">הורידו את Lupinus</span></a>
+          <a class="btn" href="#download">פלטפורמות נוספות</a>
+          <a class="btn ghost" href="https://github.com/alplix/lupinus" rel="noopener">צפייה ב-GitHub</a>
+        </div>
+        <p class="meta">חינמי וקוד פתוח · Windows · macOS · Linux</p>
+      </div>
+      <figure class="shot hero-shot">
+        <div class="frame"><img src="../screenshots/connections.png" width="1280" height="504" alt="רשימת החיבורים של Lupinus עם חיבורי VNC ו-RDP שמורים"></div>
+      </figure>
+    </section>
+
+    <section class="section" id="features">
+      <h2>כל מה שצריך, בלי מה שלא צריך</h2>
+      <div class="grid">
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <h3>VNC ו-RDP באפליקציה אחת</h3>
+          <p>VNC עם קידודי Raw, CopyRect, ZRLE ו-Tight, ו-RDP עם כניסת NLA ואישורי TLS מוצמדים.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>
+          <h3>עובד עם שיתוף המסך של Mac</h3>
+          <p>היכנסו עם שם המשתמש והסיסמה של ה-Mac — לא נדרשת תוכנה נוספת ב-Mac.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+          <h3>מהיר גם בקווים איטיים</h3>
+          <p>עומק הצבע מתאים את עצמו לחיבור ורק פיקסלים ששונו מצוירים, כך שגם הפעלות למרחקים ארוכים נשארות שמישות.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+          <h3>הרבה הפעלות במקביל</h3>
+          <p>השאירו כמה מחשבים פתוחים ועברו ביניהם מיד. חיבורים שנותקו מתחברים מחדש מעצמם.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/></svg>
+          <h3>הכול מסודר</h3>
+          <p>תגיות צבע, חיבור מהיר וייבוא או ייצוא של חיבורים שמורים.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <h3>פרטי מלכתחילה</h3>
+          <p>הסיסמאות נשמרות במחזיקת המפתחות של מערכת ההפעלה, לעולם לא בקובץ הגדרות.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/></svg>
+          <h3>לוח גזירים ומקשים</h3>
+          <p>סנכרון לוח גזירים דו-כיווני, העברת מקלדת מלאה וכפתור Ctrl+Alt+Del.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
+          <h3>מדבר בשפה שלכם</h3>
+          <p>38 שפות, כולל כתבים מימין לשמאל, נבחרות אוטומטית.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="screens">
+      <h2>ראו אותו בפעולה</h2>
+      <figure class="shot">
+        <div class="frame"><img src="../screenshots/live-session.png" width="1280" height="800" loading="lazy" alt="הפעלת שולחן עבודה מרוחק חיה ב-Lupinus"></div>
+      </figure>
+    </section>
+
+    <section class="section" id="download">
+      <h2>הורידו את Lupinus</h2>
+      <p class="sub">בחרו את הפלטפורמה שלכם. כל גרסה נבנית ב-GitHub Actions ומתפרסמת עם סכומי ביקורת.</p>
+      <div class="grid dl-grid">
+        <article class="card os" data-os="windows">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7H3zM12 4.3 21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z"/></svg>Windows</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-windows-amd64-setup.exe" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-windows-amd64-setup.exe" rel="noopener"><span>מתקין</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-windows-arm64-setup.exe" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-windows-arm64-setup.exe" rel="noopener"><span>מתקין</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-windows-amd64.zip" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-windows-amd64.zip" rel="noopener"><span>נייד</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-windows-arm64.zip" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-windows-arm64.zip" rel="noopener"><span>נייד</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-windows-386.zip" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-windows-386.zip" rel="noopener"><span>נייד</span> <em>32-bit</em></a></li>
+          </ul>
+        </article>
+        <article class="card os" data-os="macos">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>macOS</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-darwin-universal.zip" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-darwin-universal.zip" rel="noopener"><span>אוניברסלי (Intel ו-Apple silicon)</span></a></li>
+          </ul>
+        </article>
+        <article class="card os" data-os="linux">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>Linux</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-linux-amd64.tar.gz" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-linux-amd64.tar.gz" rel="noopener"><span>.tar.gz</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-linux-arm64.tar.gz" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-linux-arm64.tar.gz" rel="noopener"><span>.tar.gz</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-linux-arm.tar.gz" href="https://github.com/alplix/lupinus/releases/latest/download/lupinus-linux-arm.tar.gz" rel="noopener"><span>.tar.gz</span> <em>ARM 32-bit</em></a></li>
+          </ul>
+        </article>
+      </div>
+      <p class="note"><span>Windows דורש WebView2 (כלול במתקין). Linux דורש GTK 3 ו-WebKitGTK 4.1.</span>
+        <a data-file="SHA256SUMS.txt" href="https://github.com/alplix/lupinus/releases/latest/download/SHA256SUMS.txt" rel="noopener">סכומי ביקורת SHA-256</a></p>
+    </section>
+
+    <section class="section open" id="open">
+      <h2>חינמי וקוד פתוח</h2>
+      <p class="sub">Lupinus נכתב ב-Go עם Wails וכל קוד המקור נמצא ב-GitHub. דיווחי באגים, תרגומים ובקשות משיכה יתקבלו בברכה.</p>
+      <div class="cta center">
+        <a class="btn primary" href="https://github.com/alplix/lupinus" rel="noopener">תנו כוכב ב-GitHub</a>
+        <a class="btn" href="https://coff.ee/alplix" rel="noopener">תמכו בפרויקט</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <nav class="langs" aria-label="שפה">
+      <a href="../" hreflang="en" lang="en">English</a>
+      <a href="../tr/" hreflang="tr" lang="tr">Türkçe</a>
+      <a href="../es/" hreflang="es" lang="es">Español</a>
+      <a href="../fr/" hreflang="fr" lang="fr">Français</a>
+      <a href="../de/" hreflang="de" lang="de">Deutsch</a>
+      <a href="../it/" hreflang="it" lang="it">Italiano</a>
+      <a href="../pt/" hreflang="pt" lang="pt">Português</a>
+      <a href="../ru/" hreflang="ru" lang="ru">Русский</a>
+      <a href="../ar/" hreflang="ar" lang="ar">العربية</a>
+      <a href="../zh/" hreflang="zh" lang="zh">中文</a>
+      <a href="../ja/" hreflang="ja" lang="ja">日本語</a>
+      <a href="../ko/" hreflang="ko" lang="ko">한국어</a>
+      <a href="../hi/" hreflang="hi" lang="hi">हिन्दी</a>
+      <a href="../nl/" hreflang="nl" lang="nl">Nederlands</a>
+      <a href="../pl/" hreflang="pl" lang="pl">Polski</a>
+      <a href="../uk/" hreflang="uk" lang="uk">Українська</a>
+      <a href="../el/" hreflang="el" lang="el">Ελληνικά</a>
+      <a href="../sv/" hreflang="sv" lang="sv">Svenska</a>
+      <a href="../no/" hreflang="no" lang="no">Norsk</a>
+      <a href="../da/" hreflang="da" lang="da">Dansk</a>
+      <a href="../fi/" hreflang="fi" lang="fi">Suomi</a>
+      <a href="../cs/" hreflang="cs" lang="cs">Čeština</a>
+      <a href="../ro/" hreflang="ro" lang="ro">Română</a>
+      <a href="../hu/" hreflang="hu" lang="hu">Magyar</a>
+      <a href="../bg/" hreflang="bg" lang="bg">Български</a>
+      <a href="../hr/" hreflang="hr" lang="hr">Hrvatski</a>
+      <a href="../sr/" hreflang="sr" lang="sr">Српски</a>
+      <a href="../sk/" hreflang="sk" lang="sk">Slovenčina</a>
+      <a href="../sl/" hreflang="sl" lang="sl">Slovenščina</a>
+      <a href="../he/" hreflang="he" lang="he" aria-current="true">עברית</a>
+      <a href="../fa/" hreflang="fa" lang="fa">فارسی</a>
+      <a href="../vi/" hreflang="vi" lang="vi">Tiếng Việt</a>
+      <a href="../th/" hreflang="th" lang="th">ไทย</a>
+      <a href="../id/" hreflang="id" lang="id">Bahasa Indonesia</a>
+      <a href="../ms/" hreflang="ms" lang="ms">Bahasa Melayu</a>
+      <a href="../sw/" hreflang="sw" lang="sw">Kiswahili</a>
+      <a href="../ur/" hreflang="ur" lang="ur">اردو</a>
+      <a href="../bn/" hreflang="bn" lang="bn">বাংলা</a>
+    </nav>
+    <div class="foot-row">
+      <span>נוצר על ידי Alperen Yavuz</span>
+      <span>Lupinus · <a href="https://github.com/alplix/lupinus">github.com/alplix/lupinus</a></span>
+    </div>
+  </footer>
+
+  <script src="../site.js"></script>
+</body>
+</html>

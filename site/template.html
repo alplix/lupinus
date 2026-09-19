@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="{{@lang}}" dir="{{@dir}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{@title}}</title>
+  <meta name="description" content="{{@desc}}">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#090711">
+  <link rel="icon" type="image/svg+xml" href="{{@root}}logo.svg">
+  <link rel="canonical" href="{{@canonical}}">
+{{@hreflangs}}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Lupinus">
+  <meta property="og:locale" content="{{@ogLocale}}">
+  <meta property="og:title" content="{{@title}}">
+  <meta property="og:description" content="{{@desc}}">
+  <meta property="og:url" content="{{@canonical}}">
+  <meta property="og:image" content="{{@siteUrl}}screenshots/live-session.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="800">
+  <meta property="og:image:alt" content="{{shots.alt2}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{@title}}">
+  <meta name="twitter:description" content="{{@desc}}">
+  <meta name="twitter:image" content="{{@siteUrl}}screenshots/live-session.png">
+  <script type="application/ld+json">{{@jsonld}}</script>
+  <script>
+    /* Send a first-time visitor whose browser language has a translation to it.
+       Only from the English root, never when a language was chosen explicitly
+       (saved), and never for crawlers, which don't send a non-English language. */
+    (function () {
+      if (document.documentElement.lang !== 'en') return;
+      var L = {{@langMap}};
+      try {
+        var saved = localStorage.getItem('lupinus-lang');
+        if (saved) { if (saved !== 'en' && L[saved]) location.replace(L[saved] + location.hash); return; }
+      } catch (e) {}
+      var prefs = navigator.languages || [navigator.language || 'en'];
+      for (var i = 0; i < prefs.length; i++) {
+        var c = String(prefs[i]).toLowerCase().split('-')[0];
+        if (c === 'nb' || c === 'nn') c = 'no';
+        if (c === 'en') return;
+        if (L[c]) { location.replace(L[c] + location.hash); return; }
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="{{@root}}style.css">
+</head>
+<body>
+  <a class="skip" href="#main">{{skip}}</a>
+
+  <header class="nav">
+    <a class="brand" href="{{@home}}" aria-label="Lupinus">
+      <img src="{{@root}}logo.svg" alt="" width="32" height="32">
+      <span>Lupinus</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="https://github.com/alplix/lupinus" rel="noopener">GitHub</a>
+    </nav>
+    <label class="lang">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
+      <span class="sr">{{lang.label}}</span>
+      <select id="lang" aria-label="{{lang.label}}">
+{{@options}}
+      </select>
+    </label>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="dot"></span><span id="latest" data-tpl="{{dl.latest}}" hidden></span></p>
+        <h1>{{hero.tag}}</h1>
+        <p class="lead">{{hero.lead}}</p>
+        <div class="cta">
+          <a class="btn primary" id="cta" href="#download" data-tpl-os="{{hero.cta}}"><span id="cta-text">{{dl.title}}</span></a>
+          <a class="btn" href="#download">{{hero.other}}</a>
+          <a class="btn ghost" href="https://github.com/alplix/lupinus" rel="noopener">{{hero.github}}</a>
+        </div>
+        <p class="meta">{{hero.meta}}</p>
+      </div>
+      <figure class="shot hero-shot">
+        <div class="frame"><img src="{{@root}}screenshots/connections.png" width="1280" height="504" alt="{{shots.alt1}}"></div>
+      </figure>
+    </section>
+
+    <section class="section" id="features">
+      <h2>{{features.title}}</h2>
+      <div class="grid">
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <h3>{{feat.vnc.t}}</h3>
+          <p>{{feat.vnc.d}}</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>
+          <h3>{{feat.mac.t}}</h3>
+          <p>{{feat.mac.d}}</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+          <h3>{{feat.fast.t}}</h3>
+          <p>{{feat.fast.d}}</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+          <h3>{{feat.multi.t}}</h3>
+          <p>{{feat.multi.d}}</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/></svg>
+          <h3>{{feat.org.t}}</h3>
+          <p>{{feat.org.d}}</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <h3>{{feat.priv.t}}</h3>
+          <p>{{feat.priv.d}}</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/></svg>
+          <h3>{{feat.clip.t}}</h3>
+          <p>{{feat.clip.d}}</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
+          <h3>{{feat.lang.t}}</h3>
+          <p>{{feat.lang.d}}</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="screens">
+      <h2>{{shots.title}}</h2>
+      <figure class="shot">
+        <div class="frame"><img src="{{@root}}screenshots/live-session.png" width="1280" height="800" loading="lazy" alt="{{shots.alt2}}"></div>
+      </figure>
+    </section>
+
+    <section class="section" id="download">
+      <h2>{{dl.title}}</h2>
+      <p class="sub">{{dl.desc}}</p>
+      <div class="grid dl-grid">
+        <article class="card os" data-os="windows">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7H3zM12 4.3 21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z"/></svg>Windows</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-windows-amd64-setup.exe" href="{{@dl}}lupinus-windows-amd64-setup.exe" rel="noopener"><span>{{dl.installer}}</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-windows-arm64-setup.exe" href="{{@dl}}lupinus-windows-arm64-setup.exe" rel="noopener"><span>{{dl.installer}}</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-windows-amd64.zip" href="{{@dl}}lupinus-windows-amd64.zip" rel="noopener"><span>{{dl.portable}}</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-windows-arm64.zip" href="{{@dl}}lupinus-windows-arm64.zip" rel="noopener"><span>{{dl.portable}}</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-windows-386.zip" href="{{@dl}}lupinus-windows-386.zip" rel="noopener"><span>{{dl.portable}}</span> <em>32-bit</em></a></li>
+          </ul>
+        </article>
+        <article class="card os" data-os="macos">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>macOS</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-darwin-universal.zip" href="{{@dl}}lupinus-darwin-universal.zip" rel="noopener"><span>{{dl.universal}}</span></a></li>
+          </ul>
+        </article>
+        <article class="card os" data-os="linux">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>Linux</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-linux-amd64.tar.gz" href="{{@dl}}lupinus-linux-amd64.tar.gz" rel="noopener"><span>.tar.gz</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-linux-arm64.tar.gz" href="{{@dl}}lupinus-linux-arm64.tar.gz" rel="noopener"><span>.tar.gz</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-linux-arm.tar.gz" href="{{@dl}}lupinus-linux-arm.tar.gz" rel="noopener"><span>.tar.gz</span> <em>ARM 32-bit</em></a></li>
+          </ul>
+        </article>
+      </div>
+      <p class="note"><span>{{dl.note}}</span>
+        <a data-file="SHA256SUMS.txt" href="{{@dl}}SHA256SUMS.txt" rel="noopener">{{dl.checksums}}</a></p>
+    </section>
+
+    <section class="section open" id="open">
+      <h2>{{open.title}}</h2>
+      <p class="sub">{{open.desc}}</p>
+      <div class="cta center">
+        <a class="btn primary" href="https://github.com/alplix/lupinus" rel="noopener">{{open.star}}</a>
+        <a class="btn" href="https://coff.ee/alplix" rel="noopener">{{open.support}}</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <nav class="langs" aria-label="{{lang.label}}">
+{{@langlinks}}
+    </nav>
+    <div class="foot-row">
+      <span>{{footer.credit}}</span>
+      <span>Lupinus · <a href="https://github.com/alplix/lupinus">github.com/alplix/lupinus</a></span>
+    </div>
+  </footer>
+
+  <script src="{{@root}}site.js"></script>
+</body>
+</html>

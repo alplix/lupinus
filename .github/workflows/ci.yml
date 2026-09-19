@@ -48,6 +48,15 @@ jobs:
             exit 1
           fi
 
+      - name: Check website is up to date
+        run: |
+          node scripts/build-site.mjs
+          if [ -n "$(git status --porcelain -- docs)" ]; then
+            git status --short -- docs
+            echo "::error::docs/ does not match site/ (template + translations). Run 'node scripts/build-site.mjs' and commit the result."
+            exit 1
+          fi
+
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 

@@ -107,7 +107,7 @@ internal/rfb/               RFB client: handshake, VNC/Apple auth, Raw/CopyRect/
 internal/rdp/               RDP client: TLS + NLA/CredSSP, bitmap/GDI decoding, clipboard
 internal/store/              connections, settings, pinned certificates; passwords in the OS keyring
 internal/wsbridge/           local WebSocket bridge carrying framebuffer/input between Go and the webview
-docs/                        the project website (GitHub Pages) and its 38 translations
+site/, docs/                 the project website: sources (template + 38 translations) and generated GitHub Pages output
 internal/version/            single source of truth for the version number and branding strings
 app.go                       Wails-bound API surface (connections, live sessions, settings)
 main.go                      tray icon + window lifecycle, single-instance lock
@@ -138,10 +138,18 @@ Not yet implemented — contributions welcome:
 
 ## Website
 
-The landing page lives in [`docs/`](docs) (plain HTML/CSS/JS, no build step) and is served by
-GitHub Pages. Translations are one small JSON file per language in
-[`docs/i18n/`](docs/i18n) — copy `en.json`, translate the values, and add the language code to
-the list in `docs/site.js`. The app's own strings are in `frontend/src/locales/`.
+The site at <https://alplix.github.io/lupinus/> is plain HTML/CSS/JS served by GitHub Pages from
+[`docs/`](docs). Every language is its own pre-rendered page (`/`, `/tr/`, `/de/`, …) with a
+translated title and description, hreflang links, structured data and a sitemap, so search engines
+can index each one. `docs/` is generated — edit the sources and rebuild:
+
+```bash
+node scripts/build-site.mjs   # site/template.html + site/i18n/*.json  ->  docs/
+```
+
+To add or fix a translation, edit `site/i18n/<lang>.json` (copy `en.json` for a new language and add
+the language to the list in `scripts/build-site.mjs`). CI fails if `docs/` is out of date. The
+app's own strings live in `frontend/src/locales/`.
 
 ## Author
 
