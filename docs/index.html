@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lupinus — Native VNC &amp; RDP client</title>
+  <meta name="description" content="Lupinus is a free, open-source native remote desktop client for VNC and RDP, including macOS Screen Sharing. Windows, macOS and Linux. 38 languages.">
+  <meta name="theme-color" content="#090711">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="canonical" href="https://alplix.github.io/lupinus/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Lupinus — Native VNC &amp; RDP client">
+  <meta property="og:description" content="Free, open-source native remote desktop client for VNC and RDP, including macOS Screen Sharing.">
+  <meta property="og:url" content="https://alplix.github.io/lupinus/">
+  <meta property="og:image" content="https://alplix.github.io/lupinus/screenshots/live-session.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="Lupinus">
+      <img src="logo.svg" alt="" width="32" height="32">
+      <span>Lupinus</span>
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="https://github.com/alplix/lupinus" rel="noopener">GitHub</a>
+    </nav>
+    <label class="lang">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
+      <span class="sr" data-i18n="lang.label">Language</span>
+      <select id="lang" aria-label="Language"></select>
+    </label>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="dot"></span><span id="latest" hidden></span></p>
+        <h1 data-i18n="hero.tag">Native VNC &amp; RDP remote desktop client</h1>
+        <p class="lead" data-i18n="hero.lead">Connect to any VNC or RDP machine — including a Mac's built-in Screen Sharing — from one small, fast native app. No browser tab, no Electron.</p>
+        <div class="cta">
+          <a class="btn primary" id="cta" href="#download" data-os-label="Download for {os}"><span data-i18n="hero.cta" id="cta-text">Download for Windows</span></a>
+          <a class="btn" href="#download" data-i18n="hero.other">Other platforms</a>
+          <a class="btn ghost" href="https://github.com/alplix/lupinus" rel="noopener" data-i18n="hero.github">View on GitHub</a>
+        </div>
+        <p class="meta" data-i18n="hero.meta">Free and open source · Windows · macOS · Linux</p>
+      </div>
+      <figure class="shot hero-shot">
+        <div class="frame"><img src="screenshots/connections.png" width="1280" height="504" alt="Lupinus connection list with saved VNC and RDP connections" data-i18n-alt="shots.alt1"></div>
+      </figure>
+    </section>
+
+    <section class="section" id="features">
+      <h2 data-i18n="features.title">Everything you need, nothing you don't</h2>
+      <div class="grid">
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <h3 data-i18n="feat.vnc.t">VNC and RDP in one app</h3>
+          <p data-i18n="feat.vnc.d">VNC with Raw, CopyRect, ZRLE and Tight encodings, and RDP with NLA sign-in and pinned TLS certificates.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>
+          <h3 data-i18n="feat.mac.t">Works with a Mac's Screen Sharing</h3>
+          <p data-i18n="feat.mac.d">Sign in with your Mac username and password — no extra software needed on the Mac.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+          <h3 data-i18n="feat.fast.t">Fast on slow links</h3>
+          <p data-i18n="feat.fast.d">Colour depth adapts to your connection and only changed pixels are drawn, so even long-distance sessions stay usable.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+          <h3 data-i18n="feat.multi.t">Many sessions at once</h3>
+          <p data-i18n="feat.multi.d">Keep several machines open and switch instantly. Dropped connections reconnect on their own.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/></svg>
+          <h3 data-i18n="feat.org.t">Stay organized</h3>
+          <p data-i18n="feat.org.d">Colour tags, quick connect, and import or export of your saved connections.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <h3 data-i18n="feat.priv.t">Private by design</h3>
+          <p data-i18n="feat.priv.d">Passwords live in your OS keychain, never in a config file.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/></svg>
+          <h3 data-i18n="feat.clip.t">Clipboard and keys</h3>
+          <p data-i18n="feat.clip.d">Two-way clipboard sync, full keyboard passthrough and a Ctrl+Alt+Del button.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>
+          <h3 data-i18n="feat.lang.t">Speaks your language</h3>
+          <p data-i18n="feat.lang.d">38 languages, including right-to-left scripts, picked automatically.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="screens">
+      <h2 data-i18n="shots.title">See it in action</h2>
+      <figure class="shot">
+        <div class="frame"><img src="screenshots/live-session.png" width="1280" height="800" loading="lazy" alt="A live remote desktop session in Lupinus" data-i18n-alt="shots.alt2"></div>
+      </figure>
+    </section>
+
+    <section class="section" id="download">
+      <h2 data-i18n="dl.title">Download Lupinus</h2>
+      <p class="sub" data-i18n="dl.desc">Pick your platform. Every build is made by GitHub Actions and published with checksums.</p>
+      <div class="grid dl-grid">
+        <article class="card os" data-os="windows">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7H3zM12 4.3 21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z"/></svg>Windows</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-windows-amd64-setup.exe"><span data-i18n="dl.installer">Installer</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-windows-arm64-setup.exe"><span data-i18n="dl.installer">Installer</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-windows-amd64.zip"><span data-i18n="dl.portable">Portable</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-windows-arm64.zip"><span data-i18n="dl.portable">Portable</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-windows-386.zip"><span data-i18n="dl.portable">Portable</span> <em>32-bit</em></a></li>
+          </ul>
+        </article>
+        <article class="card os" data-os="macos">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg>macOS</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-darwin-universal.zip"><span data-i18n="dl.universal">Universal (Intel and Apple silicon)</span></a></li>
+          </ul>
+        </article>
+        <article class="card os" data-os="linux">
+          <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>Linux</h3>
+          <ul class="files">
+            <li><a data-file="lupinus-linux-amd64.tar.gz"><span>.tar.gz</span> <em>x64</em></a></li>
+            <li><a data-file="lupinus-linux-arm64.tar.gz"><span>.tar.gz</span> <em>ARM64</em></a></li>
+            <li><a data-file="lupinus-linux-arm.tar.gz"><span>.tar.gz</span> <em>ARM 32-bit</em></a></li>
+          </ul>
+        </article>
+      </div>
+      <p class="note"><span data-i18n="dl.note">Windows needs WebView2 (included in the installer). Linux needs GTK 3 and WebKitGTK 4.1.</span>
+        <a data-file="SHA256SUMS.txt" data-i18n="dl.checksums">SHA-256 checksums</a></p>
+    </section>
+
+    <section class="section open" id="open">
+      <h2 data-i18n="open.title">Free and open source</h2>
+      <p class="sub" data-i18n="open.desc">Lupinus is written in Go with Wails and the full source is on GitHub. Bug reports, translations and pull requests are welcome.</p>
+      <div class="cta center">
+        <a class="btn primary" href="https://github.com/alplix/lupinus" rel="noopener" data-i18n="open.star">Star on GitHub</a>
+        <a class="btn" href="https://coff.ee/alplix" rel="noopener" data-i18n="open.support">Support the project</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span data-i18n="footer.credit">Made by Alperen Yavuz</span>
+    <span>Lupinus · <a href="https://github.com/alplix/lupinus">github.com/alplix/lupinus</a></span>
+  </footer>
+
+  <script src="site.js"></script>
+</body>
+</html>
