@@ -21,11 +21,15 @@ import path from "node:path";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const siteDir = path.join(root, "site");
-const docsDir = path.join(root, "docs");
+const docsDir = path.join(root, process.env.LUPINUS_OUT_DIR || "docs");
 
 // Where the site is served. Change this (and only this) if it ever moves to a
-// custom domain; every absolute URL in the output derives from it.
-const SITE_URL = "https://alplix.github.io/lupinus/";
+// custom domain; every absolute URL in the output derives from it. Overridable
+// via env vars so the SAME generator can also produce a second copy for a
+// mirror (e.g. lupinus.athena.org.tr) without touching this file or the
+// docs/ output that GitHub Pages + CI check against -- default behaviour
+// (no env vars set) is byte-for-byte identical to before.
+const SITE_URL = process.env.LUPINUS_SITE_URL || "https://alplix.github.io/lupinus/";
 const REPO_URL = "https://github.com/alplix/lupinus";
 const DOWNLOAD_BASE = `${REPO_URL}/releases/latest/download/`;
 
@@ -70,6 +74,7 @@ const rel = (from, to) => {
 };
 
 // Remove previously generated language folders so a deleted language can't linger.
+mkdirSync(docsDir, { recursive: true });
 for (const entry of readdirSync(docsDir, { withFileTypes: true })) {
   if (entry.isDirectory() && LANGS.some(([c]) => c === entry.name) && entry.name !== "en") {
     rmSync(path.join(docsDir, entry.name), { recursive: true, force: true });

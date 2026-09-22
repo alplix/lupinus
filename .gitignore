@@ -1,5 +1,8 @@
 # Build output
 /build/bin/
+# scripts/build-site.mjs output for lupinus.athena.org.tr (LUPINUS_SITE_URL=...); the deployed copy lives in the
+# tilvar repo's lupinus-site/, not here -- regenerate, don't commit here
+/athena-site/
 
 # Go
 *.exe~
